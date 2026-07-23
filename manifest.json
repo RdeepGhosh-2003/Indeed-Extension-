@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "Indeed SpeedFill Auto-Fill Engine",
+  "version": "1.0.0",
+  "description": "Ultra-fast auto-filler for Indeed job applications in Chrome and Brave browser.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://*.indeed.com/*",
+    "https://indeed.com/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html"
+  },
+  "background": {
+    "service_worker": "scripts/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.indeed.com/*",
+        "https://indeed.com/*"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "js": [
+        "scripts/matcher.js",
+        "scripts/content.js"
+      ],
+      "css": [
+        "scripts/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "fill_form": {
+      "suggested_key": {
+        "default": "Alt+F",
+        "mac": "Alt+F"
+      },
+      "description": "Instant trigger auto-fill on current Indeed form"
+    }
+  }
+}
