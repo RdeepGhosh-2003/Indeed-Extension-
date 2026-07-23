@@ -97,6 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Calculate dynamic safe text colors based on YIQ lightness
     const rgb = hexToRgb(color);
+    document.documentElement.style.setProperty('--primary-rgb', `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`);
+
     const yiq = ((rgb[0]*299)+(rgb[1]*587)+(rgb[2]*114))/1000;
     
     // 1. Contrast text for buttons (e.g. White or Black text on the primary button)
