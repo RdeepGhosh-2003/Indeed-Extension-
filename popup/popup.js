@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const stepDelayInput = document.getElementById('stepDelayMs');
   const stepDelayDisplay = document.getElementById('stepDelayDisplay');
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
+  const primaryColorPicker = document.getElementById('primaryColorPicker');
 
   let currentProfile = {};
 
@@ -43,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentProfile = result.userProfile;
         populateForm(currentProfile);
         applyTheme(currentProfile.settings?.theme || 'dark');
+        applyPrimaryColor(currentProfile.settings?.primaryColor || '#3b82f6');
       } else {
         resetToDefaultJson();
       }
@@ -67,6 +69,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!currentProfile.settings) currentProfile.settings = {};
     currentProfile.settings.theme = newTheme;
     chrome.storage.local.set({ userProfile: currentProfile });
+  });
+
+  function applyPrimaryColor(color) {
+    document.documentElement.style.setProperty('--primary', color);
+    if (primaryColorPicker) primaryColorPicker.value = color;
+  }
+
+  primaryColorPicker?.addEventListener('input', (e) => {
+    applyPrimaryColor(e.target.value);
   });
 
   function resetToDefaultJson() {
@@ -226,7 +237,8 @@ document.addEventListener('DOMContentLoaded', () => {
         autoAdvanceStep: document.getElementById('autoAdvanceStep').checked,
         autoSubmitApplication: document.getElementById('autoSubmitApplication').checked,
         highlightFilledFields: document.getElementById('highlightFilledFields').checked,
-        theme: currentProfile.settings?.theme || 'dark'
+        theme: currentProfile.settings?.theme || 'dark',
+        primaryColor: primaryColorPicker ? primaryColorPicker.value : '#3b82f6'
       }
     };
 
