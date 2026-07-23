@@ -423,7 +423,8 @@ input:focus {
   align-items: center;
   justify-content: flex-end;
   height: 100%;
-  width: 12%;
+  flex: 1;
+  margin: 0 1px;
 }
 
 .bar-value {
@@ -444,6 +445,18 @@ input:focus {
   font-size: 10px;
   color: var(--text-muted);
   margin-top: 4px;
+}
+
+/* Modifier for 30-day graph to keep it clean */
+.monthly-bar-wrapper .bar-value {
+  display: none;
+}
+.monthly-bar-wrapper .bar-label {
+  font-size: 7px;
+  transform: scale(0.8);
+}
+.monthly-bar-wrapper .bar {
+  border-radius: 1px 1px 0 0;
 }
 
 .logs-list {

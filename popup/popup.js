@@ -262,18 +262,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if(elWeek) elWeek.textContent = weekCount;
       if(elMonth) elMonth.textContent = monthCount;
 
-      // Generate CSS Graph Data (Last 7 Days)
-      const graphContainer = document.getElementById('weekly-bar-chart');
-      if (graphContainer) {
+      // Reusable graph renderer
+      function renderGraph(containerId, numDays, wrapperClass = '') {
+        const graphContainer = document.getElementById(containerId);
+        if (!graphContainer) return;
         graphContainer.innerHTML = '';
-        const daysLabel = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-        const dailyCounts = new Array(7).fill(0);
         
-        // Loop through last 7 days (including today)
-        for (let i = 6; i >= 0; i--) {
+        const daysLabel = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+        const dailyCounts = new Array(numDays).fill(0);
+        
+        for (let i = numDays - 1; i >= 0; i--) {
           const targetDate = new Date(today.getTime() - (i * oneDay));
           
-          // Count logs for this specific targetDate
           let count = 0;
           logs.forEach(log => {
             if (!log.date) return;
@@ -286,20 +286,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           });
           
-          dailyCounts[6 - i] = {
-            label: i === 0 ? 'Tdy' : daysLabel[targetDate.getDay()],
-            count: count
-          };
+          // For 30 days, maybe don't label every single day to avoid clutter
+          let label = daysLabel[targetDate.getDay()];
+          if (numDays > 7 && i !== 0 && targetDate.getDay() !== 1) { // Only show label on Mondays and Today
+            label = '';
+          }
+          if (i === 0) label = 'Tdy';
+          
+          dailyCounts[(numDays - 1) - i] = { label, count };
         }
         
-        // Find max to scale bar heights
-        const maxCount = Math.max(...dailyCounts.map(d => d.count), 1); // min 1 to avoid div by zero
+        const maxCount = Math.max(...dailyCounts.map(d => d.count), 1);
         
         dailyCounts.forEach(day => {
           const heightPercent = (day.count / maxCount) * 100;
-          
           const wrapper = document.createElement('div');
-          wrapper.className = 'bar-wrapper';
+          wrapper.className = `bar-wrapper ${wrapperClass}`;
           wrapper.innerHTML = `
             <div class="bar-value">${day.count > 0 ? day.count : ''}</div>
             <div class="bar" style="height: ${Math.max(heightPercent, 2)}%;"></div>
@@ -308,6 +310,10 @@ document.addEventListener('DOMContentLoaded', () => {
           graphContainer.appendChild(wrapper);
         });
       }
+
+      // Generate CSS Graph Data
+      renderGraph('weekly-bar-chart', 7);
+      renderGraph('monthly-bar-chart', 30, 'monthly-bar-wrapper');
 
       const logsContainer = document.getElementById('logs-container');
       logsContainer.innerHTML = '';
