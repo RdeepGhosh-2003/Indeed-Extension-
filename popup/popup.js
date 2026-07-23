@@ -14,8 +14,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const stepDelayInput = document.getElementById('stepDelayMs');
   const stepDelayDisplay = document.getElementById('stepDelayDisplay');
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
-  const primaryColorPicker = document.getElementById('primaryColorPicker');
-  const resetColorBtn = document.getElementById('reset-color-btn');
+  const colorPalette = document.getElementById('color-palette');
+  
+  // 12 Curated Professional Vibrant Colors (Tailwind 500/600 shades)
+  const presetColors = [
+    '#3b82f6', // Blue (Default)
+    '#6366f1', // Indigo
+    '#8b5cf6', // Violet
+    '#d946ef', // Fuchsia
+    '#ec4899', // Pink
+    '#f43f5e', // Rose
+    '#ef4444', // Red
+    '#f97316', // Orange
+    '#f59e0b', // Amber
+    '#10b981', // Emerald
+    '#14b8a6', // Teal
+    '#06b6d4'  // Cyan
+  ];
 
   let currentProfile = {};
 
@@ -62,8 +77,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Recalculate text contrast colors for the new theme
-    if (primaryColorPicker) {
-      applyPrimaryColor(primaryColorPicker.value);
+    if (currentProfile.settings?.primaryColor) {
+      applyPrimaryColor(currentProfile.settings.primaryColor);
     }
   }
 
@@ -93,7 +108,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyPrimaryColor(color) {
     document.documentElement.style.setProperty('--primary', color);
-    if (primaryColorPicker) primaryColorPicker.value = color;
 
     // Calculate dynamic safe text colors based on YIQ lightness
     const rgb = hexToRgb(color);
@@ -111,24 +125,38 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!isLightMode && yiq < 100) safeText = '#ffffff'; // Too dark for dark mode -> white
     if (isLightMode && yiq > 150) safeText = '#0f172a'; // Too light for light mode -> dark slate
     document.documentElement.style.setProperty('--primary-text-safe', safeText);
+
+    // Update palette active state
+    if (colorPalette) {
+      const dots = colorPalette.querySelectorAll('.color-dot');
+      dots.forEach(dot => {
+        if (dot.dataset.color.toLowerCase() === color.toLowerCase()) {
+          dot.classList.add('active');
+        } else {
+          dot.classList.remove('active');
+        }
+      });
+    }
   }
 
-  primaryColorPicker?.addEventListener('input', (e) => {
-    applyPrimaryColor(e.target.value);
-  });
-
-  primaryColorPicker?.addEventListener('change', (e) => {
-    if (!currentProfile.settings) currentProfile.settings = {};
-    currentProfile.settings.primaryColor = e.target.value;
-    chrome.storage.local.set({ userProfile: currentProfile });
-  });
-
-  resetColorBtn?.addEventListener('click', () => {
-    applyPrimaryColor('#3b82f6');
-    if (!currentProfile.settings) currentProfile.settings = {};
-    currentProfile.settings.primaryColor = '#3b82f6';
-    chrome.storage.local.set({ userProfile: currentProfile });
-  });
+  // Render color palette
+  if (colorPalette) {
+    presetColors.forEach(color => {
+      const dot = document.createElement('div');
+      dot.className = 'color-dot';
+      dot.style.backgroundColor = color;
+      dot.dataset.color = color;
+      
+      dot.addEventListener('click', () => {
+        applyPrimaryColor(color);
+        if (!currentProfile.settings) currentProfile.settings = {};
+        currentProfile.settings.primaryColor = color;
+        chrome.storage.local.set({ userProfile: currentProfile });
+      });
+      
+      colorPalette.appendChild(dot);
+    });
+  }
 
   function resetToDefaultJson() {
     fetch(chrome.runtime.getURL('data/default_profile.json'))
@@ -288,7 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         autoSubmitApplication: document.getElementById('autoSubmitApplication').checked,
         highlightFilledFields: document.getElementById('highlightFilledFields').checked,
         theme: currentProfile.settings?.theme || 'dark',
-        primaryColor: primaryColorPicker ? primaryColorPicker.value : '#3b82f6'
+        primaryColor: currentProfile.settings?.primaryColor || '#3b82f6'
       }
     };
 
