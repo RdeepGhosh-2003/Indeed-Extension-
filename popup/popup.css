@@ -373,8 +373,9 @@ input:focus {
 }
 
 .logs-counter span {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--label-color);
 }
 
 .stats-row {
@@ -402,8 +403,9 @@ input:focus {
 }
 
 .stat-label {
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--label-color);
   margin-top: 2px;
 }
 
