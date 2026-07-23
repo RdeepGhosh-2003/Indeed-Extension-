@@ -32,12 +32,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'log_application' && request.job) {
     chrome.storage.local.get(['appliedJobs'], (result) => {
       const logs = result.appliedJobs || [];
-      // Prevent exact duplicates on same day
-      const isDup = logs.some(l => l.title === request.job.title && l.company === request.job.company && l.date === request.job.date);
-      if (!isDup) {
-        logs.push(request.job);
-        chrome.storage.local.set({ appliedJobs: logs });
-      }
+      logs.push(request.job);
+      chrome.storage.local.set({ appliedJobs: logs });
     });
     sendResponse({ status: 'logged' });
     return true;
