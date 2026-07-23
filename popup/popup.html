@@ -181,6 +181,30 @@
           </div>
           <button id="export-csv-btn" class="btn btn-primary">📥 Export CSV</button>
         </div>
+        
+        <div class="stats-row">
+          <div class="stat-box">
+            <span class="stat-value" id="stat-month">0</span>
+            <span class="stat-label">This Month</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-value" id="stat-week">0</span>
+            <span class="stat-label">This Week</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-value" id="stat-today">0</span>
+            <span class="stat-label">Today</span>
+          </div>
+        </div>
+
+        <!-- CSS Bar Graph -->
+        <div class="graph-container">
+          <p class="graph-title">Last 7 Days</p>
+          <div class="bar-chart" id="weekly-bar-chart">
+            <!-- Bars injected by JS -->
+          </div>
+        </div>
+
         <p class="tab-description" style="margin-top: 10px;">Recent applications:</p>
         <div id="logs-container" class="logs-list">
           <!-- Dynamic log items added here -->

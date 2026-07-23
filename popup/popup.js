@@ -230,6 +230,85 @@ document.addEventListener('DOMContentLoaded', () => {
       const logs = result.appliedJobs || [];
       document.getElementById('total-applications-count').textContent = logs.length;
       
+      // Calculate Stats
+      let todayCount = 0;
+      let weekCount = 0;
+      let monthCount = 0;
+
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const oneDay = 24 * 60 * 60 * 1000;
+      // Start of week (Sunday)
+      const weekStart = new Date(today.getTime() - (today.getDay() * oneDay)); 
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      logs.forEach(log => {
+        if (!log.date) return;
+        // Parse "M/D/YYYY" from either "M/D/YYYY" or "M/D/YYYY, h:mm PM"
+        const dateStr = log.date.split(',')[0].trim();
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+           const logDate = new Date(parseInt(parts[2], 10), parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
+           if (logDate >= today) todayCount++;
+           if (logDate >= weekStart) weekCount++;
+           if (logDate >= monthStart) monthCount++;
+        }
+      });
+
+      const elToday = document.getElementById('stat-today');
+      const elWeek = document.getElementById('stat-week');
+      const elMonth = document.getElementById('stat-month');
+      if(elToday) elToday.textContent = todayCount;
+      if(elWeek) elWeek.textContent = weekCount;
+      if(elMonth) elMonth.textContent = monthCount;
+
+      // Generate CSS Graph Data (Last 7 Days)
+      const graphContainer = document.getElementById('weekly-bar-chart');
+      if (graphContainer) {
+        graphContainer.innerHTML = '';
+        const daysLabel = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+        const dailyCounts = new Array(7).fill(0);
+        
+        // Loop through last 7 days (including today)
+        for (let i = 6; i >= 0; i--) {
+          const targetDate = new Date(today.getTime() - (i * oneDay));
+          
+          // Count logs for this specific targetDate
+          let count = 0;
+          logs.forEach(log => {
+            if (!log.date) return;
+            const parts = log.date.split(',')[0].trim().split('/');
+            if (parts.length === 3) {
+               const logDate = new Date(parseInt(parts[2], 10), parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
+               if (logDate.getTime() === targetDate.getTime()) {
+                 count++;
+               }
+            }
+          });
+          
+          dailyCounts[6 - i] = {
+            label: i === 0 ? 'Tdy' : daysLabel[targetDate.getDay()],
+            count: count
+          };
+        }
+        
+        // Find max to scale bar heights
+        const maxCount = Math.max(...dailyCounts.map(d => d.count), 1); // min 1 to avoid div by zero
+        
+        dailyCounts.forEach(day => {
+          const heightPercent = (day.count / maxCount) * 100;
+          
+          const wrapper = document.createElement('div');
+          wrapper.className = 'bar-wrapper';
+          wrapper.innerHTML = `
+            <div class="bar-value">${day.count > 0 ? day.count : ''}</div>
+            <div class="bar" style="height: ${Math.max(heightPercent, 2)}%;"></div>
+            <div class="bar-label">${day.label}</div>
+          `;
+          graphContainer.appendChild(wrapper);
+        });
+      }
+
       const logsContainer = document.getElementById('logs-container');
       logsContainer.innerHTML = '';
       

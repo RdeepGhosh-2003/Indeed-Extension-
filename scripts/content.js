@@ -9,6 +9,8 @@
   let isObserverActive = false;
   let hasNotifiedCaptcha = false;
   let originalDocumentTitle = document.title;
+  let currentJobTitle = 'Unknown Role';
+  let currentCompany = 'Unknown Company';
 
   // Load user profile from chrome.storage.local
   function loadProfile(callback) {
@@ -395,31 +397,13 @@
 
     if (submitBtn) {
       console.log('[Indeed SpeedFill] Auto-submitting application...');
-      
-      // Extract Job Info for logging
-      const pageTitle = document.title || '';
-      // Typically: "Apply for {Job Title} at {Company} - Indeed" or "Apply: {Job Title} - {Company}"
-      // Or we just grab the whole title as the job title for safety
-      let jobTitle = pageTitle.replace(' - Indeed', '').replace('Apply for ', '').replace('Apply: ', '').trim();
-      let company = 'Unknown Company';
-      
-      if (jobTitle.includes(' at ')) {
-        const parts = jobTitle.split(' at ');
-        company = parts.pop().trim();
-        jobTitle = parts.join(' at ').trim();
-      } else if (jobTitle.includes(' - ')) {
-        const parts = jobTitle.split(' - ');
-        company = parts.pop().trim();
-        jobTitle = parts.join(' - ').trim();
-      }
-
       chrome.runtime.sendMessage({
         action: 'log_application',
         job: {
-          title: jobTitle,
-          company: company,
+          title: currentJobTitle,
+          company: currentCompany,
           url: window.location.href.split('?')[0],
-          date: new Date().toLocaleDateString()
+          date: new Date().toLocaleDateString() + ', ' + new Date().toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true })
         }
       });
 
@@ -427,6 +411,48 @@
       return true;
     }
     return false;
+  }
+
+  /**
+   * Attempt to extract the job title and company from the DOM
+   * Runs continuously to catch the title before the "Review" step hides it
+   */
+  function extractJobDetailsEarly() {
+    const titleEl = document.querySelector('.ia-JobHeader-title, h1, h2, [class*="jobTitle"]');
+    const companyEl = document.querySelector('.ia-JobHeader-company, [class*="companyName"]');
+    
+    if (titleEl && titleEl.textContent) {
+      const txt = titleEl.textContent.trim();
+      // Ignore generic modal headers
+      if (!txt.toLowerCase().includes('review') && !txt.toLowerCase().includes('add a resume') && txt.length > 3) {
+        currentJobTitle = txt;
+      }
+    }
+    
+    if (companyEl && companyEl.textContent) {
+      const txt = companyEl.textContent.trim();
+      if (txt.length > 1) {
+        currentCompany = txt;
+      }
+    }
+
+    // Fallback to page title if we still have unknown role
+    if (currentJobTitle === 'Unknown Role' || currentCompany === 'Unknown Company') {
+      const pageTitle = document.title || '';
+      let parsedTitle = pageTitle.replace(' - Indeed', '').replace('Apply for ', '').replace('Apply: ', '').trim();
+      
+      if (parsedTitle.includes(' at ')) {
+        const parts = parsedTitle.split(' at ');
+        if (currentCompany === 'Unknown Company') currentCompany = parts.pop().trim();
+        if (currentJobTitle === 'Unknown Role') currentJobTitle = parts.join(' at ').trim();
+      } else if (parsedTitle.includes(' - ')) {
+        const parts = parsedTitle.split(' - ');
+        if (currentCompany === 'Unknown Company') currentCompany = parts.pop().trim();
+        if (currentJobTitle === 'Unknown Role') currentJobTitle = parts.join(' - ').trim();
+      } else if (parsedTitle && !parsedTitle.toLowerCase().includes('job search')) {
+        if (currentJobTitle === 'Unknown Role') currentJobTitle = parsedTitle;
+      }
+    }
   }
 
   /**
@@ -481,6 +507,9 @@
       loadProfile(() => fillCurrentForm());
       return 0;
     }
+
+    // Attempt to parse job details at every step before they disappear
+    extractJobDetailsEarly();
 
     // 1. Check for Resume step
     const handledResume = handleResumeStep();
