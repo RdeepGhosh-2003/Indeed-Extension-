@@ -296,7 +296,7 @@ input:focus {
 .badge-delay {
   font-size: 10px;
   background: rgba(var(--primary-rgb), 0.2);
-  color: #60a5fa;
+  color: var(--primary-text-safe, var(--primary));
   padding: 1px 6px;
   border-radius: 8px;
   font-weight: 700;
@@ -310,7 +310,7 @@ input:focus {
   border-radius: var(--radius-sm);
   text-align: center;
   font-size: 12px;
-  color: #93c5fd;
+  color: var(--primary-text-safe, var(--primary));
 }
 
 /* Buttons */
