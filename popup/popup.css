@@ -11,8 +11,20 @@
   --accent: #10b981;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
+  --label-color: #cbd5e1;
   --radius-sm: 8px;
   --radius-md: 12px;
+}
+
+body.light-theme {
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-input: #f1f5f9;
+  --border-color: #e2e8f0;
+  --border-hover: #cbd5e1;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --label-color: #334155;
 }
 
 * {
@@ -78,7 +90,7 @@ body {
 /* Navigation Tabs */
 .tab-nav {
   display: flex;
-  background: #0f172a;
+  background: var(--bg-main);
   padding: 6px;
   gap: 4px;
   border-bottom: 1px solid var(--border-color);
@@ -178,7 +190,7 @@ body {
 label {
   font-size: 11px;
   font-weight: 600;
-  color: #cbd5e1;
+  color: var(--label-color);
 }
 
 input[type="text"],
@@ -384,7 +396,7 @@ input:focus {
 .stat-value {
   font-size: 16px;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-main);
 }
 
 .stat-label {
@@ -435,10 +447,13 @@ input:focus {
 
 .bar {
   width: 100%;
-  background-color: var(--primary);
-  border-radius: 3px 3px 0 0;
+  background: linear-gradient(135deg, #60a5fa, #2563eb);
+  box-shadow: inset -2px 0 5px rgba(0, 0, 0, 0.2), 
+              inset 2px 0 4px rgba(255, 255, 255, 0.4), 
+              0 -2px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 4px 4px 0 0;
   min-height: 2px;
-  transition: height 0.3s ease;
+  transition: height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .bar-label {

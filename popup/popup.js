@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const toast = document.getElementById('toast');
   const stepDelayInput = document.getElementById('stepDelayMs');
   const stepDelayDisplay = document.getElementById('stepDelayDisplay');
+  const themeToggleBtn = document.getElementById('theme-toggle-btn');
 
   let currentProfile = {};
 
@@ -41,11 +42,32 @@ document.addEventListener('DOMContentLoaded', () => {
       if (result && result.userProfile) {
         currentProfile = result.userProfile;
         populateForm(currentProfile);
+        applyTheme(currentProfile.settings?.theme || 'dark');
       } else {
         resetToDefaultJson();
       }
     });
   }
+
+  function applyTheme(theme) {
+    if (theme === 'light') {
+      document.body.classList.add('light-theme');
+      if (themeToggleBtn) themeToggleBtn.textContent = '☀️';
+    } else {
+      document.body.classList.remove('light-theme');
+      if (themeToggleBtn) themeToggleBtn.textContent = '🌙';
+    }
+  }
+
+  themeToggleBtn?.addEventListener('click', () => {
+    const isLight = document.body.classList.toggle('light-theme');
+    const newTheme = isLight ? 'light' : 'dark';
+    if (themeToggleBtn) themeToggleBtn.textContent = isLight ? '☀️' : '🌙';
+    
+    if (!currentProfile.settings) currentProfile.settings = {};
+    currentProfile.settings.theme = newTheme;
+    chrome.storage.local.set({ userProfile: currentProfile });
+  });
 
   function resetToDefaultJson() {
     fetch(chrome.runtime.getURL('data/default_profile.json'))
@@ -203,7 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
         autoSelectResume: document.getElementById('autoSelectResume').checked,
         autoAdvanceStep: document.getElementById('autoAdvanceStep').checked,
         autoSubmitApplication: document.getElementById('autoSubmitApplication').checked,
-        highlightFilledFields: document.getElementById('highlightFilledFields').checked
+        highlightFilledFields: document.getElementById('highlightFilledFields').checked,
+        theme: currentProfile.settings?.theme || 'dark'
       }
     };
 
