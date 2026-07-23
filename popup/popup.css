@@ -366,7 +366,7 @@ input:focus {
 .stats-row {
   display: flex;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
 .stat-box {
@@ -395,7 +395,7 @@ input:focus {
 
 /* CSS Bar Chart */
 .graph-container {
-  margin-top: 15px;
+  margin-top: 8px;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
