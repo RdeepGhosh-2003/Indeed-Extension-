@@ -81,7 +81,7 @@ body {
 .logo .badge {
   font-size: 11px;
   background: rgba(59, 130, 246, 0.2);
-  color: var(--primary);
+  color: var(--primary-text-safe, var(--primary));
   padding: 2px 8px;
   border-radius: 12px;
   border: 1px solid rgba(59, 130, 246, 0.4);
@@ -164,7 +164,7 @@ body {
 .role-section-header h3 {
   font-size: 13px;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--primary-text-safe, var(--primary));
   display: flex;
   align-items: center;
   gap: 6px;
@@ -326,7 +326,7 @@ input:focus {
 
 .btn-primary {
   background: var(--primary);
-  color: #ffffff;
+  color: var(--primary-contrast-text, #ffffff);
 }
 
 .btn-primary:hover {
@@ -367,7 +367,7 @@ input:focus {
 
 .logs-counter h2 {
   font-size: 24px;
-  color: var(--primary);
+  color: var(--primary-text-safe, var(--primary));
   margin-bottom: 2px;
 }
 

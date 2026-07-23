@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const stepDelayDisplay = document.getElementById('stepDelayDisplay');
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
   const primaryColorPicker = document.getElementById('primaryColorPicker');
+  const resetColorBtn = document.getElementById('reset-color-btn');
 
   let currentProfile = {};
 
@@ -57,7 +58,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (themeToggleBtn) themeToggleBtn.textContent = '☀️';
     } else {
       document.body.classList.remove('light-theme');
-      if (themeToggleBtn) themeToggleBtn.textContent = '🌙';
+    if (themeToggleBtn) themeToggleBtn.textContent = '🌙';
+    }
+    
+    // Recalculate text contrast colors for the new theme
+    if (primaryColorPicker) {
+      applyPrimaryColor(primaryColorPicker.value);
     }
   }
 
@@ -71,13 +77,46 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.set({ userProfile: currentProfile });
   });
 
+  function hexToRgb(hex) {
+    if(!hex) return [59, 130, 246]; // default blue
+    let c;
+    if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
+        c = hex.substring(1).split('');
+        if(c.length === 3){
+            c = [c[0], c[0], c[1], c[1], c[2], c[2]];
+        }
+        c = '0x' + c.join('');
+        return [(c>>16)&255, (c>>8)&255, c&255];
+    }
+    return [59, 130, 246];
+  }
+
   function applyPrimaryColor(color) {
     document.documentElement.style.setProperty('--primary', color);
     if (primaryColorPicker) primaryColorPicker.value = color;
+
+    // Calculate dynamic safe text colors based on YIQ lightness
+    const rgb = hexToRgb(color);
+    const yiq = ((rgb[0]*299)+(rgb[1]*587)+(rgb[2]*114))/1000;
+    
+    // 1. Contrast text for buttons (e.g. White or Black text on the primary button)
+    const contrastText = (yiq >= 128) ? '#0f172a' : '#ffffff';
+    document.documentElement.style.setProperty('--primary-contrast-text', contrastText);
+
+    // 2. Safe text color for labels (e.g. big numbers)
+    const isLightMode = document.body.classList.contains('light-theme');
+    let safeText = color;
+    if (!isLightMode && yiq < 100) safeText = '#ffffff'; // Too dark for dark mode -> white
+    if (isLightMode && yiq > 150) safeText = '#0f172a'; // Too light for light mode -> dark slate
+    document.documentElement.style.setProperty('--primary-text-safe', safeText);
   }
 
   primaryColorPicker?.addEventListener('input', (e) => {
     applyPrimaryColor(e.target.value);
+  });
+
+  resetColorBtn?.addEventListener('click', () => {
+    applyPrimaryColor('#3b82f6');
   });
 
   function resetToDefaultJson() {
