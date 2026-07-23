@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Target Role
     document.getElementById('targetJobTitle').value = profile.work?.targetRole?.jobTitle || profile.work?.recentJobTitle || '';
     document.getElementById('targetLocation').value = profile.work?.targetRole?.targetLocation || profile.personal?.city || '';
+    document.getElementById('targetResumeName').value = profile.work?.targetRole?.targetResumeName || '';
     document.getElementById('noticePeriod').value = profile.work?.targetRole?.noticePeriod || profile.work?.noticePeriod || '';
     document.getElementById('expectedSalary').value = profile.work?.targetRole?.expectedSalary || profile.work?.expectedSalary || '';
 
@@ -173,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
         targetRole: {
           jobTitle: document.getElementById('targetJobTitle').value.trim(),
           targetLocation: document.getElementById('targetLocation').value.trim(),
+          targetResumeName: document.getElementById('targetResumeName').value.trim(),
           noticePeriod: document.getElementById('noticePeriod').value.trim(),
           expectedSalary: document.getElementById('expectedSalary').value.trim()
         }
@@ -222,5 +224,72 @@ document.addEventListener('DOMContentLoaded', () => {
     return String(str).replace(/"/g, '&quot;');
   }
 
+  // Load Applied Jobs Logs
+  function loadLogs() {
+    chrome.storage.local.get(['appliedJobs'], (result) => {
+      const logs = result.appliedJobs || [];
+      document.getElementById('total-applications-count').textContent = logs.length;
+      
+      const logsContainer = document.getElementById('logs-container');
+      logsContainer.innerHTML = '';
+      
+      if (logs.length === 0) {
+        logsContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 11px; text-align: center; margin-top: 10px;">No applications tracked yet.</p>';
+        return;
+      }
+
+      // Show most recent first
+      logs.slice().reverse().forEach(log => {
+        const item = document.createElement('div');
+        item.className = 'log-item';
+        item.innerHTML = `
+          <div class="log-item-header">
+            <span class="log-item-title" title="${escapeHtml(log.title)}">${escapeHtml(log.title)}</span>
+            <span class="log-item-date">${escapeHtml(log.date)}</span>
+          </div>
+          <div class="log-item-company">${escapeHtml(log.company)}</div>
+        `;
+        // Add link on click if url exists
+        if (log.url) {
+          item.style.cursor = 'pointer';
+          item.addEventListener('click', () => chrome.tabs.create({ url: log.url }));
+        }
+        logsContainer.appendChild(item);
+      });
+    });
+  }
+
+  // Export CSV
+  document.getElementById('export-csv-btn')?.addEventListener('click', () => {
+    chrome.storage.local.get(['appliedJobs'], (result) => {
+      const logs = result.appliedJobs || [];
+      if (logs.length === 0) {
+        showToast('No applications to export!');
+        return;
+      }
+
+      // Create CSV header
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Date Applied,Company Name,Job Title,Job Link\r\n";
+
+      logs.forEach(log => {
+        const date = `"${log.date || ''}"`;
+        const company = `"${(log.company || '').replace(/"/g, '""')}"`;
+        const title = `"${(log.title || '').replace(/"/g, '""')}"`;
+        const url = `"${log.url || ''}"`;
+        csvContent += `${date},${company},${title},${url}\r\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Indeed_SpeedFill_Applications_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  });
+
   loadProfileData();
+  loadLogs();
 });

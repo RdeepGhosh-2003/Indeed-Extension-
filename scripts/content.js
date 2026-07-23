@@ -230,11 +230,26 @@
 
     if (!isResumeStep) return false;
 
-    // Locate resume card if present
-    const resumeCard = document.querySelector('[data-testid*="resume"], [class*="ResumeCard"], [class*="resume-option"], div[role="radio"]');
-    if (resumeCard && !resumeCard.classList.contains('selected') && resumeCard.getAttribute('aria-checked') !== 'true') {
-      console.log('[Indeed SpeedFill] Auto-selecting existing resume...');
-      resumeCard.click();
+    // Locate all resume cards
+    const resumeCards = Array.from(document.querySelectorAll('[data-testid*="resume"], [class*="ResumeCard"], [class*="resume-option"], div[role="radio"]'));
+    if (resumeCards.length === 0) return false;
+
+    let targetCard = null;
+    const targetResumeName = userProfile?.work?.targetRole?.targetResumeName?.toLowerCase().trim();
+
+    // 1. Try to find a specific resume if user defined one
+    if (targetResumeName) {
+      targetCard = resumeCards.find(card => card.textContent.toLowerCase().includes(targetResumeName));
+    }
+
+    // 2. Fallback to the first resume if no specific target or not found
+    if (!targetCard) {
+      targetCard = resumeCards[0];
+    }
+
+    if (targetCard && !targetCard.classList.contains('selected') && targetCard.getAttribute('aria-checked') !== 'true') {
+      console.log('[Indeed SpeedFill] Auto-selecting resume...');
+      targetCard.click();
     }
 
     const delay = userProfile?.settings?.stepDelayMs || 500;
@@ -380,6 +395,34 @@
 
     if (submitBtn) {
       console.log('[Indeed SpeedFill] Auto-submitting application...');
+      
+      // Extract Job Info for logging
+      const pageTitle = document.title || '';
+      // Typically: "Apply for {Job Title} at {Company} - Indeed" or "Apply: {Job Title} - {Company}"
+      // Or we just grab the whole title as the job title for safety
+      let jobTitle = pageTitle.replace(' - Indeed', '').replace('Apply for ', '').replace('Apply: ', '').trim();
+      let company = 'Unknown Company';
+      
+      if (jobTitle.includes(' at ')) {
+        const parts = jobTitle.split(' at ');
+        company = parts.pop().trim();
+        jobTitle = parts.join(' at ').trim();
+      } else if (jobTitle.includes(' - ')) {
+        const parts = jobTitle.split(' - ');
+        company = parts.pop().trim();
+        jobTitle = parts.join(' - ').trim();
+      }
+
+      chrome.runtime.sendMessage({
+        action: 'log_application',
+        job: {
+          title: jobTitle,
+          company: company,
+          url: window.location.href.split('?')[0],
+          date: new Date().toLocaleDateString()
+        }
+      });
+
       submitBtn.click();
       return true;
     }
