@@ -117,8 +117,17 @@ document.addEventListener('DOMContentLoaded', () => {
     applyPrimaryColor(e.target.value);
   });
 
+  primaryColorPicker?.addEventListener('change', (e) => {
+    if (!currentProfile.settings) currentProfile.settings = {};
+    currentProfile.settings.primaryColor = e.target.value;
+    chrome.storage.local.set({ userProfile: currentProfile });
+  });
+
   resetColorBtn?.addEventListener('click', () => {
     applyPrimaryColor('#3b82f6');
+    if (!currentProfile.settings) currentProfile.settings = {};
+    currentProfile.settings.primaryColor = '#3b82f6';
+    chrome.storage.local.set({ userProfile: currentProfile });
   });
 
   function resetToDefaultJson() {
