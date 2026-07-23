@@ -280,14 +280,13 @@
           <input type="checkbox" id="highlightFilledFields" class="toggle-checkbox">
         </div>
 
-        <div class="setting-item">
-          <div class="setting-info">
-            <label for="primaryColorPicker">🎨 Custom Extension Theme Color</label>
-            <span class="subtext">Personalize the main accent color of the UI</span>
+        <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 12px;">
+          <div class="setting-info" style="max-width: 100%;">
+            <label>🎨 Custom Extension Theme Color</label>
+            <span class="subtext">Personalize the main accent color. We have curated 12 vibrant options.</span>
           </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <input type="color" id="primaryColorPicker" value="#3b82f6" style="cursor: pointer; background: transparent; border: none; padding: 0; width: 30px; height: 30px;">
-            <button id="reset-color-btn" class="btn btn-secondary" style="padding: 4px 8px; font-size: 10px;" title="Reset to Default Blue">Reset</button>
+          <div id="color-palette" class="color-palette">
+            <!-- Color dots injected by JS -->
           </div>
         </div>
 
