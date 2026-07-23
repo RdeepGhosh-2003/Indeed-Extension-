@@ -6,6 +6,7 @@
   --bg-input: #1e293b;
   --border-color: #334155;
   --border-hover: #475569;
+  --bg-target-card: rgba(30, 41, 59, 0.7);
   --primary: #3b82f6;
   --primary-hover: #2563eb;
   --accent: #10b981;
@@ -22,6 +23,7 @@ body.light-theme {
   --bg-input: #f1f5f9;
   --border-color: #94a3b8;
   --border-hover: #64748b;
+  --bg-target-card: rgba(203, 213, 225, 0.3); /* Much lighter gray-blue for light theme */
   --text-main: #0f172a;
   --text-muted: #64748b;
   --label-color: #334155;
@@ -157,7 +159,7 @@ body {
 
 .role-section-card.target-card {
   border-color: rgba(59, 130, 246, 0.4);
-  background: rgba(30, 41, 59, 0.7);
+  background: var(--bg-target-card);
 }
 
 .role-section-header h3 {
