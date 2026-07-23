@@ -336,6 +336,77 @@ input:focus {
   width: 100%;
 }
 
+/* Logs Tab styles */
+.logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-card);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.logs-counter {
+  display: flex;
+  flex-direction: column;
+}
+
+.logs-counter h2 {
+  font-size: 24px;
+  color: var(--primary);
+  margin-bottom: 2px;
+}
+
+.logs-counter span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.logs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.log-item {
+  background: var(--bg-input);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.log-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 250px;
+}
+
+.log-item-date {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.log-item-company {
+  font-size: 11px;
+  color: var(--accent);
+}
+
 /* Toast */
 .toast {
   position: fixed;

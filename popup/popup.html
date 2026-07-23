@@ -26,6 +26,7 @@
       <button class="tab-btn" data-tab="tab-personal">👤 Personal</button>
       <button class="tab-btn" data-tab="tab-education">🎓 Education</button>
       <button class="tab-btn" data-tab="tab-screening">❓ Q&A Bank</button>
+      <button class="tab-btn" data-tab="tab-logs">📊 Logs</button>
       <button class="tab-btn" data-tab="tab-settings">⚙️ Settings</button>
     </nav>
 
@@ -72,6 +73,10 @@
           <div class="form-group">
             <label for="targetLocation">Preferred Target Location</label>
             <input type="text" id="targetLocation" placeholder="e.g. Sample City">
+          </div>
+          <div class="form-group">
+            <label for="targetResumeName">Target Resume Name (Optional)</label>
+            <input type="text" id="targetResumeName" placeholder="e.g. Software Engineer Resume">
           </div>
           <div class="form-grid">
             <div class="form-group">
@@ -165,6 +170,21 @@
         </div>
 
         <button id="add-qa-btn" class="btn btn-secondary full-width">+ Add Custom Screening Answer</button>
+      </section>
+
+      <!-- Logs Tab -->
+      <section id="tab-logs" class="tab-pane">
+        <div class="logs-header">
+          <div class="logs-counter">
+            <h2 id="total-applications-count">0</h2>
+            <span>Total Applications Sent</span>
+          </div>
+          <button id="export-csv-btn" class="btn btn-primary">📥 Export CSV</button>
+        </div>
+        <p class="tab-description" style="margin-top: 10px;">Recent applications:</p>
+        <div id="logs-container" class="logs-list">
+          <!-- Dynamic log items added here -->
+        </div>
       </section>
 
       <!-- Settings Tab -->
