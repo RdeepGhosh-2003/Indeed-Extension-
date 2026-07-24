@@ -37,10 +37,25 @@ body.light-theme {
 
 body {
   width: 450px;
-  height: 610px;
+  height: 600px;
   background-color: var(--bg-main);
   color: var(--text-main);
   overflow: hidden;
+}
+
+/* Custom Scrollbar for a sleek professional look */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 .app-container {
@@ -317,6 +332,7 @@ input:focus {
 .color-palette {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
   width: 100%;
 }
