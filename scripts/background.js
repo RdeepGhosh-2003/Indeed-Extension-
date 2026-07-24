@@ -38,7 +38,60 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ status: 'logged' });
     return true;
   }
+
+  if (request.action === 'generate_cover_letter') {
+    handleGenerateCoverLetter(request).then(response => {
+      sendResponse(response);
+    }).catch(err => {
+      sendResponse({ error: err.message });
+    });
+    return true; // Keep message channel open for async
+  }
 });
+
+async function handleGenerateCoverLetter({ jobTitle, company, profile }) {
+  const apiKey = profile.settings?.geminiApiKey;
+  if (!apiKey) throw new Error('No API Key provided');
+
+  let prompt = `Write a professional cover letter for the position of "${jobTitle}" at "${company}".\n\n`;
+  prompt += `Here are my details to include:\n`;
+  
+  if (profile.personal?.fullName) prompt += `- Name: ${profile.personal.fullName}\n`;
+  if (profile.personal?.phone) prompt += `- Phone: ${profile.personal.phone}\n`;
+  if (profile.personal?.email) prompt += `- Email: ${profile.personal.email}\n`;
+  
+  if (profile.work?.currentRole?.jobTitle) prompt += `- Current Role: ${profile.work.currentRole.jobTitle} at ${profile.work.currentRole.company || 'current company'}\n`;
+  if (profile.work?.currentRole?.yearsExperience) prompt += `- Years Experience: ${profile.work.currentRole.yearsExperience}\n`;
+  
+  if (profile.education?.degree) prompt += `- Education: ${profile.education.degree} in ${profile.education.major} from ${profile.education.university}\n`;
+
+  const instructions = profile.personal?.coverLetterInstructions;
+  if (instructions) {
+    prompt += `\nAdditional Instructions:\n${instructions}\n`;
+  } else {
+    prompt += `\nKeep it concise, confident, and professional. Do not include placeholder brackets like [Date], just write the core letter bodies so I can paste it directly into an application box.`;
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }]
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`API returned ${response.status}`);
+  }
+
+  const data = await response.json();
+  const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  
+  if (!generatedText) throw new Error('No text generated from AI');
+  
+  return { text: generatedText.trim() };
+}
 
 // Handle notification click to switch directly to the CAPTCHA tab
 if (chrome.notifications) {

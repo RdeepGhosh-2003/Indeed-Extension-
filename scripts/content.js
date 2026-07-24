@@ -346,14 +346,95 @@
     appContainer.addEventListener('input', handleUserManualInput);
     appContainer.addEventListener('click', (e) => {
       if (e.target.tagName.toLowerCase() === 'input' || e.target.type === 'radio') {
-        setTimeout(handleUserManualInput, 100);
+        setTimeout(() => handleUserManualInput(e), 100);
       }
     });
 
     appContainer.dataset.speedfillListenersAttached = 'true';
   }
 
-  function handleUserManualInput() {
+  function injectSaveButton(container, inputEl = null) {
+    if (container.dataset.speedfillSaveInjected) return;
+    container.dataset.speedfillSaveInjected = 'true';
+
+    const btn = document.createElement('button');
+    btn.className = 'speedfill-save-btn';
+    btn.type = 'button';
+    btn.innerHTML = '💾 Save to SpeedFill';
+    
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const targetInput = inputEl || container;
+      
+      // Get Question Text
+      let headerEl = null;
+      if (inputEl && inputEl.type === 'radio') {
+        headerEl = container.querySelector('legend, h1, h2, h3, h4, label, [class*="label"], [class*="header"]');
+      } else {
+        headerEl = document.querySelector(`label[for="${CSS.escape(targetInput.id)}"]`) || container.closest('label') || container.previousElementSibling;
+      }
+      
+      let questionText = headerEl ? headerEl.textContent.trim() : '';
+      if (!questionText && container.parentElement) questionText = container.parentElement.innerText.split('\n')[0];
+      if (!questionText) questionText = 'Unknown Question';
+
+      // Clean Question
+      questionText = questionText.replace(/[^a-zA-Z0-9 ]/g, '').toLowerCase().substring(0, 30).trim();
+
+      // Get Answer
+      let answerText = '';
+      if (inputEl && inputEl.type === 'radio') {
+        const selected = container.querySelector('input[type="radio"]:checked');
+        answerText = selected ? getRadioText(selected) : '';
+      } else {
+        answerText = targetInput.value;
+      }
+
+      if (!answerText) {
+        btn.innerHTML = '❌ Empty';
+        setTimeout(() => btn.innerHTML = '💾 Save to SpeedFill', 1500);
+        return;
+      }
+
+      // Save to Storage
+      if (userProfile && userProfile.screening) {
+        userProfile.screening.push({ keywords: questionText, answer: answerText });
+        chrome.storage.local.set({ userProfile: userProfile }, () => {
+          btn.innerHTML = '✅ Saved!';
+          btn.classList.add('saved');
+          btn.disabled = true;
+          console.log('[SpeedFill] Saved new Q&A:', questionText, '->', answerText);
+        });
+      }
+    });
+
+    if (inputEl && inputEl.type === 'radio') {
+      const header = container.querySelector('legend, h1, h2, h3, h4');
+      if (header) header.appendChild(btn);
+      else container.appendChild(btn);
+    } else {
+      container.parentNode.insertBefore(btn, container.nextSibling);
+    }
+  }
+
+  function handleUserManualInput(e) {
+    if (e && e.target && e.target.tagName && !e.target.dataset.speedfillSaveInjected) {
+      const el = e.target;
+      if (el.tagName.toLowerCase() === 'input' || el.tagName.toLowerCase() === 'textarea' || el.tagName.toLowerCase() === 'select') {
+        if (el.type !== 'radio' && el.type !== 'checkbox') {
+          if (!el.value) return; // Don't inject if they just cleared it
+          injectSaveButton(el);
+        } else if (el.type === 'radio') {
+          const container = el.closest('fieldset, [role="radiogroup"], .ia-Questions-item');
+          if (container && !container.dataset.speedfillSaveInjected) {
+            injectSaveButton(container, el);
+          }
+        }
+      }
+    }
+
     const remainingUnmatched = checkUnmatchedUnfilledFields();
     updatePillStatus(remainingUnmatched, 0);
 
@@ -527,6 +608,15 @@
     inputs.forEach(input => {
       if (input.offsetWidth === 0 && input.offsetHeight === 0) return;
 
+      // AI Cover Letter Generator Hook
+      if (input.tagName.toLowerCase() === 'textarea' && !input.dataset.speedfillAiInjected) {
+        const lbl = document.querySelector(`label[for="${CSS.escape(input.id)}"]`) || input.closest('label');
+        const lblTxt = lbl ? lbl.textContent.toLowerCase() : '';
+        if (lblTxt.includes('cover letter') || lblTxt.includes('message to hiring') || lblTxt.includes('additional information')) {
+          injectAICoverLetterButton(input);
+        }
+      }
+
       const match = window.SpeedFillMatcher?.matchField(input, userProfile);
       if (match && match.value) {
         const success = setReactInputValue(input, match.value);
@@ -606,6 +696,48 @@
 
     observer.observe(document.body, { childList: true, subtree: true });
     isObserverActive = true;
+  }
+
+  function injectAICoverLetterButton(textarea) {
+    if (textarea.dataset.speedfillAiInjected) return;
+    textarea.dataset.speedfillAiInjected = 'true';
+
+    const btn = document.createElement('button');
+    btn.className = 'speedfill-ai-btn';
+    btn.type = 'button';
+    btn.innerHTML = '✨ Generate with AI';
+    
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!userProfile?.settings?.geminiApiKey) {
+        alert('Please add your Gemini API Key in the SpeedFill Settings to use the AI Cover Letter Generator.');
+        return;
+      }
+      
+      btn.innerHTML = '⏳ Generating...';
+      btn.disabled = true;
+
+      chrome.runtime.sendMessage({
+        action: 'generate_cover_letter',
+        jobTitle: currentJobTitle,
+        company: currentCompany,
+        profile: userProfile
+      }, (response) => {
+        btn.disabled = false;
+        if (response && response.text) {
+          setReactInputValue(textarea, response.text);
+          btn.innerHTML = '✅ Generated!';
+          setTimeout(() => btn.innerHTML = '✨ Generate with AI', 3000);
+        } else {
+          btn.innerHTML = '❌ Failed';
+          console.error('[SpeedFill] AI Gen Error:', response?.error);
+          alert('Failed to generate cover letter. Check your API key.');
+          setTimeout(() => btn.innerHTML = '✨ Generate with AI', 3000);
+        }
+      });
+    });
+
+    textarea.parentNode.insertBefore(btn, textarea);
   }
 
   /**
