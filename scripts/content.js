@@ -581,7 +581,7 @@
           clearInterval(window._captchaMonitorInterval);
         }
       }
-    }, 350);
+    }, 100); // Super-fast 100ms interval for lightning fast auto-submit
   }
 
   /**
@@ -670,7 +670,7 @@
     const unmatchedCount = checkUnmatchedUnfilledFields();
     updatePillStatus(unmatchedCount, filledCount);
 
-    const stepDelay = userProfile?.settings?.stepDelayMs || 500;
+    const stepDelay = userProfile?.settings?.stepDelayMs !== undefined ? userProfile.settings.stepDelayMs : 150;
 
     // 6. PAUSE AUTO-ADVANCE / SUBMIT if there are unmatched empty fields and feature is enabled
     if (unmatchedCount > 0 && userProfile?.settings?.pauseOnUnmatchedFields !== false) {
@@ -713,7 +713,7 @@
           if (userProfile?.settings?.autoFillOnLoad !== false) {
             fillCurrentForm();
           }
-        }, 150);
+        }, 50); // Aggressive 50ms DOM mutation debounce
       }
     });
 
@@ -811,9 +811,9 @@
     setupDOMObserver();
     createFloatingPill();
     
-    setTimeout(fillCurrentForm, 300);
-    setTimeout(fillCurrentForm, 800);
-    setTimeout(fillCurrentForm, 1500);
+    setTimeout(fillCurrentForm, 100); // 100ms
+    setTimeout(fillCurrentForm, 400); // 400ms
+    setTimeout(fillCurrentForm, 1000); // 1s
     monitorCaptchaAndSubmit();
   });
 
