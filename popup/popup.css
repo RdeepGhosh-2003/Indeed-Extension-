@@ -330,11 +330,12 @@ input:focus {
 
 /* Color Palette */
 .color-palette {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(7, 24px);
   justify-content: center;
-  gap: 10px;
+  gap: 12px 14px; /* vertical 12px, horizontal 14px */
   width: 100%;
+  margin-top: 8px;
 }
 
 .color-dot {
