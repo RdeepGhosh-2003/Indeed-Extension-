@@ -26,3 +26,6 @@ desktop.ini
 dist/
 build/
 *.zip
+
+# Project Tracking
+CHANGELOG.md
