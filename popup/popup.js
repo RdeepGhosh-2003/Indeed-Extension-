@@ -16,20 +16,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
   const colorPalette = document.getElementById('color-palette');
   
-  // 12 Curated Professional Vibrant Colors (Tailwind 500/600 shades)
+  // 14 Curated Professional Vibrant Colors (Tailwind 500/600 shades)
   const presetColors = [
     '#3b82f6', // Blue (Default)
-    '#6366f1', // Indigo
-    '#8b5cf6', // Violet
-    '#d946ef', // Fuchsia
-    '#ec4899', // Pink
-    '#f43f5e', // Rose
-    '#ef4444', // Red
-    '#f97316', // Orange
-    '#f59e0b', // Amber
-    '#10b981', // Emerald
+    '#0ea5e9', // Sky
+    '#06b6d4', // Cyan
     '#14b8a6', // Teal
-    '#06b6d4'  // Cyan
+    '#10b981', // Emerald
+    '#84cc16', // Lime
+    '#eab308', // Amber
+    '#f97316', // Orange
+    '#ef4444', // Red
+    '#f43f5e', // Rose
+    '#ec4899', // Pink
+    '#d946ef', // Fuchsia
+    '#8b5cf6', // Violet
+    '#6366f1'  // Indigo
   ];
 
   let currentProfile = {};
