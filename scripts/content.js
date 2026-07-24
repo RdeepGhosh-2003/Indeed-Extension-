@@ -412,10 +412,26 @@
 
     if (inputEl && inputEl.type === 'radio') {
       const header = container.querySelector('legend, h1, h2, h3, h4');
-      if (header) header.appendChild(btn);
-      else container.appendChild(btn);
+      if (header) {
+        header.appendChild(btn);
+      } else {
+        container.appendChild(btn);
+      }
     } else {
-      container.parentNode.insertBefore(btn, container.nextSibling);
+      // Safely inject below the input's wrapper to avoid breaking borders
+      const wrapper = container.closest('.ia-Questions-item') || container.parentElement;
+      if (wrapper && wrapper.nextSibling) {
+        wrapper.parentNode.insertBefore(btn, wrapper.nextSibling);
+      } else if (wrapper) {
+        wrapper.parentNode.appendChild(btn);
+      } else {
+        container.parentNode.insertBefore(btn, container.nextSibling);
+      }
+      
+      // Ensure the button is styled to sit nicely below
+      btn.style.display = 'block';
+      btn.style.marginTop = '6px';
+      btn.style.marginLeft = '0';
     }
   }
 
@@ -423,6 +439,13 @@
     if (e && e.target && e.target.tagName && !e.target.dataset.speedfillSaveInjected) {
       const el = e.target;
       if (el.tagName.toLowerCase() === 'input' || el.tagName.toLowerCase() === 'textarea' || el.tagName.toLowerCase() === 'select') {
+        
+        // FILTER: If this is a standard recognized field (like Job Title, Name), DO NOT inject the Q&A save button.
+        const match = window.SpeedFillMatcher?.matchField(el, userProfile);
+        if (match !== null && match !== undefined) {
+          return; 
+        }
+
         if (el.type !== 'radio' && el.type !== 'checkbox') {
           if (!el.value) return; // Don't inject if they just cleared it
           injectSaveButton(el);
