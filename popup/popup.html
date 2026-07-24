@@ -130,14 +130,17 @@
             <input type="text" id="city" placeholder="Sample City">
           </div>
           <div class="form-group">
-            <label for="state">State</label>
-            <input type="text" id="state" placeholder="Sample State">
+            <label for="state">State / Province</label>
+            <input type="text" id="state" placeholder="e.g. CA">
           </div>
         </div>
-
         <div class="form-group">
           <label for="linkedin">LinkedIn Profile URL</label>
-          <input type="url" id="linkedin" placeholder="https://linkedin.com/in/username">
+          <input type="url" id="linkedin" placeholder="e.g. linkedin.com/in/johndoe">
+        </div>
+        <div class="form-group" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+          <label for="coverLetterInstructions" style="color: #d946ef;">✨ AI Cover Letter Instructions (Optional)</label>
+          <textarea id="coverLetterInstructions" placeholder="e.g. Keep it under 3 paragraphs, highlight my data analysis skills, and mention I love problem solving." style="width: 100%; height: 60px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px; border-radius: var(--radius-sm); font-size: 11px; resize: none;"></textarea>
         </div>
       </section>
 
@@ -288,6 +291,14 @@
           <div id="color-palette" class="color-palette">
             <!-- Color dots injected by JS -->
           </div>
+        </div>
+        
+        <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 8px; border-color: rgba(217, 70, 239, 0.4); background: rgba(217, 70, 239, 0.05);">
+          <div class="setting-info" style="max-width: 100%;">
+            <label style="color: #d946ef;">🤖 Google Gemini API Key</label>
+            <span class="subtext">Required to power the AI Cover Letter generator. Get a free key from Google AI Studio.</span>
+          </div>
+          <input type="password" id="geminiApiKey" placeholder="Paste your API key here..." style="width: 100%;">
         </div>
 
         <button id="reset-defaults-btn" class="btn btn-secondary full-width" style="margin-top: 10px; color: #f87171; border-color: rgba(248, 113, 113, 0.4);">🔄 Reset Profile to Default (Software Engineer / Acme Corp)</button>

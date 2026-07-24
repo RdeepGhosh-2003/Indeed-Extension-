@@ -58,3 +58,61 @@
   border-radius: 10px;
   font-weight: 700;
 }
+
+/* Smart Q&A Save Button */
+.speedfill-save-btn {
+  background-color: #10b981;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  transition: all 0.2s;
+  vertical-align: middle;
+  z-index: 9999;
+}
+
+.speedfill-save-btn:hover {
+  background-color: #059669;
+  transform: translateY(-1px);
+}
+
+.speedfill-save-btn.saved {
+  background-color: #4b5563;
+  cursor: default;
+}
+
+/* AI Cover Letter Button */
+.speedfill-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #d946ef, #8b5cf6);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 10px rgba(217, 70, 239, 0.3);
+  transition: all 0.2s;
+  z-index: 9999;
+}
+
+.speedfill-ai-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.speedfill-ai-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

@@ -196,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('city').value = profile.personal?.city || '';
     document.getElementById('state').value = profile.personal?.state || '';
     document.getElementById('linkedin').value = profile.personal?.linkedin || '';
+    document.getElementById('coverLetterInstructions').value = profile.personal?.coverLetterInstructions || '';
 
     // Education
     document.getElementById('degree').value = profile.education?.degree || '';
@@ -210,6 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('autoAdvanceStep').checked = profile.settings?.autoAdvanceStep !== false;
     document.getElementById('autoSubmitApplication').checked = profile.settings?.autoSubmitApplication !== false;
     document.getElementById('highlightFilledFields').checked = profile.settings?.highlightFilledFields !== false;
+    document.getElementById('geminiApiKey').value = profile.settings?.geminiApiKey || '';
 
     const delayVal = profile.settings?.stepDelayMs !== undefined ? profile.settings.stepDelayMs : 500;
     if (stepDelayInput) stepDelayInput.value = delayVal;
@@ -300,7 +302,8 @@ document.addEventListener('DOMContentLoaded', () => {
         phone: document.getElementById('phone').value.trim(),
         city: document.getElementById('city').value.trim(),
         state: document.getElementById('state').value.trim(),
-        linkedin: document.getElementById('linkedin').value.trim()
+        linkedin: document.getElementById('linkedin').value.trim(),
+        coverLetterInstructions: document.getElementById('coverLetterInstructions').value.trim()
       },
       education: {
         degree: document.getElementById('degree').value.trim(),
@@ -317,6 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
         autoAdvanceStep: document.getElementById('autoAdvanceStep').checked,
         autoSubmitApplication: document.getElementById('autoSubmitApplication').checked,
         highlightFilledFields: document.getElementById('highlightFilledFields').checked,
+        geminiApiKey: document.getElementById('geminiApiKey').value.trim(),
         theme: currentProfile.settings?.theme || 'dark',
         primaryColor: currentProfile.settings?.primaryColor || '#3b82f6'
       }
