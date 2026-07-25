@@ -440,6 +440,11 @@
       const el = e.target;
       if (el.tagName.toLowerCase() === 'input' || el.tagName.toLowerCase() === 'textarea' || el.tagName.toLowerCase() === 'select') {
         
+        // FILTER: Do not inject on global search inputs
+        if (window.SpeedFillMatcher?.isSearchInput(el)) {
+          return;
+        }
+
         // FILTER: If this is a standard recognized field (like Job Title, Name), DO NOT inject the Q&A save button.
         const match = window.SpeedFillMatcher?.matchField(el, userProfile);
         if (match !== null && match !== undefined) {
@@ -772,7 +777,8 @@
     const pill = document.createElement('div');
     pill.id = 'speedfill-floating-pill';
     pill.innerHTML = `
-      <span>⚡ SpeedFill</span>
+      <span style="font-weight: 800; color: #2557a7; letter-spacing: -0.5px;">indeed</span>
+      <span style="margin-left: 4px;">SpeedFill</span>
       <span class="speedfill-badge">Alt + F</span>
     `;
 
@@ -806,10 +812,38 @@
     }
   });
 
+  // Extract and save applied job keys when visiting Indeed pages or My Jobs
+  function autoExtractAppliedJobs() {
+    try {
+      const pageText = document.documentElement.outerHTML || '';
+      const foundJks = new Set();
+      const regexes = [
+        /jk=([a-f0-9]{16})/gi,
+        /data-jk="([a-f0-9]{16})"/gi,
+        /"jobkey":"([a-f0-9]{16})"/gi,
+        /"jk":"([a-f0-9]{16})"/gi
+      ];
+      regexes.forEach(rgx => {
+        let match;
+        while ((match = rgx.exec(pageText)) !== null) {
+          if (match[1]) foundJks.add(match[1]);
+        }
+      });
+      if (foundJks.size > 0) {
+        chrome.storage.local.get(['appliedJobs'], (res) => {
+          const existing = new Set(res.appliedJobs || []);
+          foundJks.forEach(k => existing.add(k));
+          chrome.storage.local.set({ appliedJobs: Array.from(existing) });
+        });
+      }
+    } catch(e){}
+  }
+
   // Initialization & Repeated Fill Retries for async React rendering
   loadProfile(() => {
     setupDOMObserver();
     createFloatingPill();
+    autoExtractAppliedJobs();
     
     setTimeout(fillCurrentForm, 100); // 100ms
     setTimeout(fillCurrentForm, 400); // 400ms
