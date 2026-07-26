@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Indeed SpeedFill Auto-Fill Engine",
-  "version": "1.0.0",
-  "description": "Ultra-fast auto-filler for Indeed job applications in Chrome and Brave browser.",
+  "version": "1.1.0",
+  "description": "Ultra-fast auto-filler and Search Fill assistant for Indeed job search and application forms.",
   "permissions": [
     "storage",
     "activeTab",

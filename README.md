@@ -41,6 +41,10 @@
 - **Range**: `0 ms` (instant) to `10,000 ms` (10 seconds) in steps of `100 ms`.
 - Customize the delay between filling, advancing, or submitting steps to match your desired automation speed.
 
+### 🔍 9. 1-Click Search Fill
+- Automatically injects a **Search Fill** button right next to the Indeed search bar.
+- Instantly populates Indeed's "What" and "Where" global search inputs with the **Target Job Title** and **Preferred Target Location** from your SpeedFill dashboard.
+
 ---
 
 ## 🛠️ Step-by-Step Installation Guide

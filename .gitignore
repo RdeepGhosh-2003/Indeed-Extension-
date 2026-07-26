@@ -29,3 +29,6 @@ build/
 
 # Project Tracking
 CHANGELOG.md
+
+# System Generated
+.agents/

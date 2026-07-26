@@ -17,7 +17,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (chrome.notifications) {
       chrome.notifications.create(notifId, {
         type: 'basic',
-        iconUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAADhJREFUeJztwQENAAAAwqD3T20PBxAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwG048AABpWc2swAAAABJRU5ErkJggg==',
+        iconUrl: 'icons/icon.png',
         title: '🤖 Indeed SpeedFill - CAPTCHA Required!',
         message: 'A job application tab requires CAPTCHA verification. Click to switch to this tab.',
         priority: 2,
