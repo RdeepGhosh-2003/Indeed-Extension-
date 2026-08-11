@@ -313,7 +313,7 @@
     if (profile.screening && Array.isArray(profile.screening)) {
       const cleanLabelText = labelText.replace(/[^a-z0-9 ]/g, '');
       for (const item of profile.screening) {
-        const keywords = item.keywords.toLowerCase().split(',').map(k => k.trim().replace(/[^a-z0-9 ]/g, ''));
+        const keywords = item.keywords.toLowerCase().split(/[,/|]/).map(k => k.trim().replace(/[^a-z0-9 ]/g, ''));
         for (const kw of keywords) {
           if (kw && (cleanLabelText.includes(kw) || labelText.includes(kw))) {
             return { value: item.answer, confidence: 0.85, keyMatched: kw };

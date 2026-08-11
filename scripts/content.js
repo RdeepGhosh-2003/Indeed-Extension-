@@ -201,15 +201,19 @@
 
       // 3. Q&A Bank Matching for other screening questions
       else if (userProfile.screening && Array.isArray(userProfile.screening)) {
+        const cleanQuestionText = questionText.replace(/[^a-z0-9 ]/g, '');
         for (const item of userProfile.screening) {
-          const keywords = item.keywords.toLowerCase().split(',').map(k => k.trim());
-          const match = keywords.some(kw => kw && questionText.includes(kw));
-          if (match) {
-            const ans = item.answer.toLowerCase();
-            if (ans.includes('yes') || ans.includes('true')) {
-              selectedInput = radioInputs.find(r => getRadioText(r, containerEl).includes('yes'));
-            } else if (ans.includes('no') || ans.includes('false')) {
-              selectedInput = radioInputs.find(r => getRadioText(r, containerEl).includes('no'));
+          // Split by comma, slash, or pipe to handle cases like "Zip/Postal Code" -> "zip", "postal code"
+          const keywords = item.keywords.toLowerCase().split(/[,/|]/).map(k => k.trim().replace(/[^a-z0-9 ]/g, ''));
+          for (const kw of keywords) {
+            if (kw && (cleanQuestionText.includes(kw) || questionText.includes(kw))) {
+              const ans = item.answer.toLowerCase();
+              if (ans.includes('yes') || ans.includes('true')) {
+                selectedInput = radioInputs.find(r => getRadioText(r, containerEl).includes('yes'));
+              } else if (ans.includes('no') || ans.includes('false')) {
+                selectedInput = radioInputs.find(r => getRadioText(r, containerEl).includes('no'));
+              }
+              break;
             }
             break;
           }
@@ -491,9 +495,12 @@
         }
 
         // FILTER: If this is a standard recognized field, DO NOT inject the Q&A save button.
-        const match = window.SpeedFillMatcher?.matchField(el, userProfile);
-        if (match !== null && match !== undefined) {
-          return; 
+        // UNLESS it's a radio button, because standard fields don't auto-select radio groups well, so letting the user save it as a Custom Q&A works best.
+        if (el.type !== 'radio') {
+          const match = window.SpeedFillMatcher?.matchField(el, userProfile);
+          if (match !== null && match !== undefined) {
+            return; 
+          }
         }
 
         if (el.type !== 'radio' && el.type !== 'checkbox') {
