@@ -393,7 +393,117 @@
     appContainer.dataset.speedfillListenersAttached = 'true';
   }
 
+  function injectSaveButton(container, inputEl = null) {
+    if (container.dataset.speedfillSaveInjected) return;
+    container.dataset.speedfillSaveInjected = 'true';
+
+    const btn = document.createElement('button');
+    btn.className = 'speedfill-save-btn';
+    btn.type = 'button';
+    btn.innerHTML = '💾 Save to SpeedFill';
+    
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const targetInput = inputEl || container;
+      const appContainer = window.SpeedFillMatcher?.getAppContainer() || document;
+      
+      // Get Question Text
+      let headerEl = null;
+      if (inputEl && inputEl.type === 'radio') {
+        headerEl = container.querySelector('legend, h1, h2, h3, h4, label, [class*="label"], [class*="header"]');
+      } else {
+        headerEl = appContainer.querySelector(`label[for="${CSS.escape(targetInput.id)}"]`) || container.closest('label') || container.previousElementSibling;
+      }
+      
+      let questionText = headerEl ? headerEl.textContent.trim() : '';
+      if (!questionText && container.parentElement) questionText = container.parentElement.innerText.split('\n')[0];
+      if (!questionText) questionText = 'Unknown Question';
+
+      // Clean Question
+      questionText = questionText.replace(/[^a-zA-Z0-9 ]/g, '').toLowerCase().substring(0, 30).trim();
+
+      // Get Answer
+      let answerText = '';
+      if (inputEl && inputEl.type === 'radio') {
+        const selected = container.querySelector('input[type="radio"]:checked');
+        answerText = selected ? getRadioText(selected, appContainer) : '';
+      } else {
+        answerText = targetInput.value;
+      }
+
+      if (!answerText) {
+        btn.innerHTML = '❌ Empty';
+        setTimeout(() => btn.innerHTML = '💾 Save to SpeedFill', 1500);
+        return;
+      }
+
+      // Save to Storage
+      if (userProfile && userProfile.screening) {
+        userProfile.screening.push({ keywords: questionText, answer: answerText });
+        chrome.storage.local.set({ userProfile: userProfile }, () => {
+          btn.innerHTML = '✅ Saved!';
+          btn.classList.add('saved');
+          btn.disabled = true;
+          console.log('[SpeedFill] Saved new Q&A:', questionText, '->', answerText);
+        });
+      }
+    });
+
+    if (inputEl && inputEl.type === 'radio') {
+      const header = container.querySelector('legend, h1, h2, h3, h4');
+      if (header) {
+        header.appendChild(btn);
+      } else {
+        container.appendChild(btn);
+      }
+    } else {
+      // Safely inject below the input's wrapper to avoid breaking borders
+      const wrapper = container.closest('.ia-Questions-item') || container.parentElement;
+      if (wrapper && wrapper.nextSibling) {
+        wrapper.parentNode.insertBefore(btn, wrapper.nextSibling);
+      } else if (wrapper) {
+        wrapper.parentNode.appendChild(btn);
+      } else {
+        container.parentNode.insertBefore(btn, container.nextSibling);
+      }
+      
+      // Ensure the button is styled to sit nicely below
+      btn.style.display = 'block';
+      btn.style.marginTop = '6px';
+      btn.style.marginLeft = '0';
+    }
+  }
+
   function handleUserManualInput(e) {
+    if (e && e.target && e.target.tagName && !e.target.dataset.speedfillSaveInjected) {
+      const el = e.target;
+      if (el.tagName.toLowerCase() === 'input' || el.tagName.toLowerCase() === 'textarea' || el.tagName.toLowerCase() === 'select') {
+        
+        // FILTER: Do not inject on global search inputs
+        if (window.SpeedFillMatcher?.isSearchInput && window.SpeedFillMatcher.isSearchInput(el)) {
+          return;
+        }
+
+        // FILTER: If this is a standard recognized field, DO NOT inject the Q&A save button.
+        const match = window.SpeedFillMatcher?.matchField(el, userProfile);
+        if (match !== null && match !== undefined) {
+          return; 
+        }
+
+        if (el.type !== 'radio' && el.type !== 'checkbox') {
+          if (!el.value) return; // Don't inject if they just cleared it
+          injectSaveButton(el);
+        } else if (el.type === 'radio') {
+          const container = el.closest('fieldset, [role="radiogroup"], .ia-Questions-item');
+          if (container && !container.dataset.speedfillSaveInjected) {
+            injectSaveButton(container, el);
+          }
+        }
+      }
+    }
+
     const appContainer = window.SpeedFillMatcher?.getAppContainer();
     if (!appContainer) return;
 
