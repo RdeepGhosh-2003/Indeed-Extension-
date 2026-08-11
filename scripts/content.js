@@ -420,12 +420,23 @@
         headerEl = appContainer.querySelector(`label[for="${CSS.escape(targetInput.id)}"]`) || container.closest('label') || container.previousElementSibling;
       }
       
-      let questionText = headerEl ? headerEl.textContent.trim() : '';
-      if (!questionText && container.parentElement) questionText = container.parentElement.innerText.split('\n')[0];
+      let questionText = '';
+      if (headerEl) {
+        const clone = headerEl.cloneNode(true);
+        clone.querySelectorAll('.speedfill-save-btn').forEach(b => b.remove());
+        questionText = clone.textContent.trim();
+      }
+
+      if (!questionText && container.parentElement) {
+        const clone = container.parentElement.cloneNode(true);
+        clone.querySelectorAll('.speedfill-save-btn').forEach(b => b.remove());
+        questionText = clone.innerText ? clone.innerText.split('\n')[0] : clone.textContent.trim();
+      }
+      
       if (!questionText) questionText = 'Unknown Question';
 
       // Clean Question
-      questionText = questionText.replace(/[^a-zA-Z0-9 ]/g, '').toLowerCase().substring(0, 30).trim();
+      questionText = questionText.replace(/[^a-zA-Z0-9 ]/g, '').toLowerCase().substring(0, 80).trim();
 
       // Get Answer
       let answerText = '';
