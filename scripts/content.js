@@ -753,7 +753,7 @@
 
     // 6. PAUSE AUTO-ADVANCE / SUBMIT if there are unmatched empty fields and feature is enabled
     if (unmatchedCount > 0 && userProfile?.settings?.pauseOnUnmatchedFields !== false) {
-      console.warn(`[Indeed SpeedFill] Pausing auto-advance: ${unmatchedCount} field(s) need manual input/dashboard entry.`);
+      console.log(`[Indeed SpeedFill] Pausing auto-advance: ${unmatchedCount} field(s) need manual input/dashboard entry.`);
       return filledCount;
     }
 
