@@ -500,7 +500,7 @@
           if (!el.value) return; // Don't inject if they just cleared it
           injectSaveButton(el);
         } else if (el.type === 'radio') {
-          const container = el.closest('fieldset, [role="radiogroup"], .ia-Questions-item');
+          const container = el.closest('fieldset, [role="radiogroup"], .ia-Questions-item, div[class*="Question"], div[class*="FormGroup"]') || el.parentElement.parentElement;
           if (container && !container.dataset.speedfillSaveInjected) {
             injectSaveButton(container, el);
           }
