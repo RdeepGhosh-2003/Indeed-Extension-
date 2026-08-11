@@ -44,11 +44,10 @@
   function setReactInputValue(el, value) {
     if (!el || value === undefined || value === null) return false;
 
-    // Skip if disabled, readOnly, focused, manually edited, or already filled
+    // Skip if disabled, readOnly, manually edited, or already filled
     if (
       el.disabled || 
       el.readOnly || 
-      document.activeElement === el || 
       el.dataset.speedfillUserEdited === 'true' || 
       el.value === String(value)
     ) {
@@ -447,6 +446,11 @@
           btn.classList.add('saved');
           btn.disabled = true;
           console.log('[SpeedFill] Saved new Q&A:', questionText, '->', answerText);
+          
+          // Trigger manual input check to resume auto-advance
+          setTimeout(() => {
+            handleUserManualInput();
+          }, 300);
         });
       }
     });
@@ -512,6 +516,17 @@
 
     // If remaining unmatched fields reach 0, auto-advance step!
     if (remainingUnmatched === 0 && userProfile?.settings?.autoAdvanceStep !== false) {
+      const hasUnsaved = appContainer.querySelectorAll('.speedfill-save-btn:not(.saved)').length > 0;
+      if (hasUnsaved) {
+        console.log('[Indeed SpeedFill] Pausing auto-advance to allow user to save new Q&A.');
+        const pill = document.getElementById('speedfill-floating-pill');
+        if (pill) {
+          pill.classList.add('pill-warning');
+          pill.innerHTML = `<span>⏸️ Paused (Save to Resume)</span>`;
+        }
+        return;
+      }
+
       console.log('[Indeed SpeedFill] All missing fields completed by user! Auto-advancing step...');
       const delay = userProfile?.settings?.stepDelayMs || 500;
       clearTimeout(window._speedfillAdvanceTimer);
@@ -750,8 +765,17 @@
 
     // 8. Optionally auto-advance intermediate steps
     if ((userProfile?.settings?.autoAdvanceStep !== false || handledResume) && (filledCount > 0 || handledResume)) {
-      clearTimeout(window._speedfillAdvanceTimer);
-      window._speedfillAdvanceTimer = setTimeout(() => clickContinueButton(appContainer), stepDelay);
+      const hasUnsaved = appContainer.querySelectorAll('.speedfill-save-btn:not(.saved)').length > 0;
+      if (!hasUnsaved) {
+        clearTimeout(window._speedfillAdvanceTimer);
+        window._speedfillAdvanceTimer = setTimeout(() => clickContinueButton(appContainer), stepDelay);
+      } else {
+        const pill = document.getElementById('speedfill-floating-pill');
+        if (pill) {
+          pill.classList.add('pill-warning');
+          pill.innerHTML = `<span>⏸️ Paused (Save to Resume)</span>`;
+        }
+      }
     }
 
     return filledCount;
