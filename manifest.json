@@ -10,7 +10,10 @@
   ],
   "host_permissions": [
     "https://*.indeed.com/*",
-    "https://indeed.com/*"
+    "https://indeed.com/*",
+    "https://*.indeedapply.com/*",
+    "https://indeedapply.com/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "action": {
     "default_popup": "popup/popup.html"
@@ -22,7 +25,9 @@
     {
       "matches": [
         "https://*.indeed.com/*",
-        "https://indeed.com/*"
+        "https://indeed.com/*",
+        "https://*.indeedapply.com/*",
+        "https://indeedapply.com/*"
       ],
       "all_frames": true,
       "match_about_blank": true,
