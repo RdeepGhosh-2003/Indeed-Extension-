@@ -10,6 +10,8 @@
     '[data-testid="ia-container"]',
     '[data-testid="ia-modal"]',
     '[data-testid="ia-JobApplication"]',
+    '[data-testid*="application"]',
+    '[data-testid*="smartapply"]',
     'main#ia-container',
     '#ia-container',
     'div.ia-BasePage',
@@ -21,7 +23,10 @@
     'div[class*="ia-Application"]',
     '[class*="ia-Form"]',
     '[class*="ia-Application"]',
-    'form[action*="apply"]'
+    'form[action*="apply"]',
+    'div.ia-Questions',
+    'main',
+    'form'
   ];
 
   const EXCLUDED_CONTAINER_SELECTORS = [
@@ -88,27 +93,27 @@
     // Target Role (Specific compound keys)
     { keys: ['target job title', 'desired job title', 'target role', 'desired position', 'desired role', 'role applying for', 'job title showing relevant experience'], path: 'work.targetRole.jobTitle' },
     { keys: ['target location', 'preferred location', 'desired city'], path: 'work.targetRole.targetLocation' },
-    { keys: ['expected ctc', 'expected salary', 'desired salary'], path: 'work.targetRole.expectedSalary' },
-    { keys: ['notice period', 'how soon can you start'], path: 'work.targetRole.noticePeriod' },
+    { keys: ['expected fixed ctc', 'expected fixed', 'expected ctc', 'expected salary', 'desired salary', 'expected compensation', 'salary expectation'], path: 'work.targetRole.expectedSalary' },
+    { keys: ['notice period', 'how soon can you start', 'notice'], path: 'work.targetRole.noticePeriod' },
 
     // Current Role (Specific compound keys)
     { keys: ['current job title', 'present position', 'recent job title', 'current role'], path: 'work.currentRole.jobTitle' },
     { keys: ['current company', 'present company', 'company name'], path: 'work.currentRole.company' },
     { keys: ['years of experience', 'years experience', 'total experience', 'experience in years'], path: 'work.currentRole.yearsExperience' },
-    { keys: ['current ctc', 'current salary', 'present salary'], path: 'work.currentRole.currentSalary' },
+    { keys: ['current fixed ctc', 'current fixed', 'fixed ctc', 'current ctc', 'current salary', 'present salary', 'current compensation'], path: 'work.currentRole.currentSalary' },
 
     // Personal Details (Specific compound keys)
     { keys: ['first name', 'given name'], path: 'personal.firstName' },
     { keys: ['last name', 'surname', 'family name'], path: 'personal.lastName' },
     { keys: ['full name'], path: 'personal.fullName' },
     { keys: ['email address'], path: 'personal.email' },
-    { keys: ['contact number', 'phone number'], path: 'personal.phone' },
+    { keys: ['contact number', 'phone number', 'mobile number'], path: 'personal.phone' },
     { keys: ['current city'], path: 'personal.city' },
-    { keys: ['linkedin profile', 'linkedin url'], path: 'personal.linkedin' },
+    { keys: ['linkedin profile', 'linkedin url', 'website', 'personal website', 'portfolio website'], path: 'personal.linkedin' },
 
     // Education (Specific compound keys)
-    { keys: ['highest degree', 'education level'], path: 'education.degree' },
-    { keys: ['field of study'], path: 'education.major' },
+    { keys: ['highest qualification', 'highest degree', 'education level', 'qualification', 'degree'], path: 'education.degree' },
+    { keys: ['field of study', 'stream', 'specialization'], path: 'education.major' },
     { keys: ['graduation year', 'year of completion', 'passing year'], path: 'education.graduationYear' },
 
     // Generic Single-Word Keys (Fallback)
@@ -124,7 +129,7 @@
     { keys: ['linkedin'], path: 'personal.linkedin' },
     { keys: ['github', 'portfolio'], path: 'personal.github' },
     { keys: ['degree', 'qualification'], path: 'education.degree' },
-    { keys: ['major', 'stream', 'specialization'], path: 'education.major' },
+    { keys: ['major'], path: 'education.major' },
     { keys: ['university', 'college', 'school', 'institution'], path: 'education.university' }
   ];
 
@@ -153,18 +158,25 @@
         return container;
       }
     }
-    if (typeof window !== 'undefined' && window.top !== window.self) {
-      const href = (window.location && window.location.href) || '';
-      if (
-        href.includes('indeed.com/apply') ||
-        href.includes('/apply') ||
-        href.includes('smartapply.indeed.com') ||
-        href.includes('indeedapply.com') ||
-        href.includes('ia.indeed.com')
-      ) {
-        return document.body;
-      }
+
+    // Support both iframe and direct full-tab application URLs
+    const href = (typeof window !== 'undefined' && window.location && window.location.href) ? window.location.href : '';
+    if (
+      href.includes('indeed.com/apply') ||
+      href.includes('/apply') ||
+      href.includes('smartapply.indeed.com') ||
+      href.includes('indeedapply.com') ||
+      href.includes('ia.indeed.com')
+    ) {
+      const mainEl = document.querySelector('main, #ia-container, [role="main"], form');
+      return mainEl || document.body;
     }
+
+    // Fallback if application question elements exist on the page
+    if (document.querySelector('.ia-Questions-item, [data-testid*="ia-"], .ia-BasePage, div[class*="ia-"]')) {
+      return document.querySelector('main, #ia-container, [role="main"]') || document.body;
+    }
+
     return null;
   }
 
@@ -273,13 +285,34 @@
     if (el.name) labelTexts.push(el.name);
     if (el.id) labelTexts.push(el.id);
 
-    // 5. Closest container section header / legend text (sanitized: no [class*="css-"] or form > div)
+    // 5. Closest container section header / legend / question title
     if (el.closest) {
-      const container = el.closest('.ia-FormGroup, .ia-Questions-item, fieldset, div[class*="Job"], div[class*="Form"]');
+      const container = el.closest('.ia-FormGroup, .ia-Questions-item, [data-testid*="question"], fieldset, div[class*="Question"], div[class*="FormGroup"], div[class*="field"]');
       if (container) {
-        const header = container.querySelector('h1, h2, h3, h4, legend, label, [class*="label"], [class*="header"]');
-        if (header) labelTexts.push(header.textContent);
+        // Check aria-labelledby on container
+        const cAriaLabelledBy = container.getAttribute('aria-labelledby');
+        if (cAriaLabelledBy) {
+          const target = document.getElementById(cAriaLabelledBy);
+          if (target && target.textContent) labelTexts.push(target.textContent);
+        }
+
+        const heading = container.querySelector('h1, h2, h3, h4, legend, [id$="-label"]');
+        if (heading) {
+          labelTexts.push(heading.textContent);
+        } else {
+          const fallback = Array.from(container.querySelectorAll('[class*="label"], [class*="Label"], [class*="header"], [class*="title"], [class*="question"], p, span'))
+            .find(el2 => el2 !== el && !el2.querySelector('input, select, textarea') && !el2.closest('label:has(input)'));
+          if (fallback) labelTexts.push(fallback.textContent);
+        }
       }
+    }
+
+    // 6. Check previous sibling elements
+    if (el.previousElementSibling && el.previousElementSibling.textContent) {
+      labelTexts.push(el.previousElementSibling.textContent);
+    }
+    if (el.parentElement && el.parentElement.previousElementSibling && el.parentElement.previousElementSibling.textContent) {
+      labelTexts.push(el.parentElement.previousElementSibling.textContent);
     }
 
     return labelTexts.join(' ').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -311,12 +344,25 @@
 
     // Check screening Q&A bank
     if (profile.screening && Array.isArray(profile.screening)) {
-      const cleanLabelText = labelText.replace(/[^a-z0-9 ]/g, '');
+      const cleanLabelText = labelText.replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+      const labelTokens = cleanLabelText.split(' ').filter(t => t.length > 2);
+
       for (const item of profile.screening) {
-        const keywords = item.keywords.toLowerCase().split(/[,/|]/).map(k => k.trim().replace(/[^a-z0-9 ]/g, ''));
-        for (const kw of keywords) {
-          if (kw && (cleanLabelText.includes(kw) || labelText.includes(kw))) {
-            return { value: item.answer, confidence: 0.85, keyMatched: kw };
+        if (!item.keywords || !item.answer) continue;
+        const keywords = item.keywords.toLowerCase().split(/[,/|]/).map(k => k.trim());
+        for (const rawKw of keywords) {
+          const kw = rawKw.replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+          if (!kw) continue;
+
+          // 1. Direct phrase containment
+          if (cleanLabelText.includes(kw) || labelText.includes(kw) || kw.includes(cleanLabelText)) {
+            return { value: item.answer, confidence: 0.95, keyMatched: kw };
+          }
+
+          // 2. Token overlap matching for multi-word questions (e.g. "sql proficiency" in "how would you rate your sql proficiency")
+          const kwTokens = kw.split(' ').filter(t => t.length > 2 && !['what', 'your', 'with', 'have', 'from', 'this', 'that', 'rate', 'how', 'are', 'you'].includes(t));
+          if (kwTokens.length > 0 && kwTokens.every(tok => cleanLabelText.includes(tok) || labelText.includes(tok))) {
+            return { value: item.answer, confidence: 0.90, keyMatched: kw };
           }
         }
       }
@@ -387,6 +433,10 @@
     if (!input || value === undefined || value === null) return false;
     const valueStr = String(value);
 
+    // BUG FIX: Skip (return false) if the value is already set — prevents inflated
+    // filledCount that caused the Q&A step to auto-advance before radios were filled.
+    if (input.value === valueStr) return false;
+
     const prototype = (typeof window !== 'undefined' && window.HTMLInputElement && window.HTMLInputElement.prototype)
       ? window.HTMLInputElement.prototype
       : (typeof HTMLInputElement !== 'undefined' ? HTMLInputElement.prototype : null);
@@ -414,6 +464,115 @@
     return true;
   }
 
+  /**
+   * Normalize education degree / qualification into standard categories using word boundaries
+   */
+  function normalizeDegreeCategory(str) {
+    if (!str) return null;
+    const clean = String(str).toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!clean) return null;
+
+    // Master's / Post Graduate (checked before Bachelor's to handle M.Tech / MBA cleanly)
+    if (
+      /\b(master|masters|m\s*tech|mtech|m\s*e|me|m\s*sc|msc|mca|m\s*com|mcom|m\s*a|ma|mba|ms|postgraduate|post\s*graduate|post\s*graduation)\b/i.test(clean)
+    ) {
+      return 'master';
+    }
+
+    // Doctorate
+    if (/\b(ph\s*d|phd|doctorate|doctoral|doctor)\b/i.test(clean)) {
+      return 'doctorate';
+    }
+
+    // Bachelor's / Graduation
+    if (
+      /\b(bachelor|bachelors|b\s*tech|btech|b\s*e|be|b\s*sc|bsc|bca|b\s*com|bcom|b\s*a|ba|bba|bs|undergraduate|graduation|graduate)\b/i.test(clean)
+    ) {
+      return 'bachelor';
+    }
+
+    // High School / Secondary
+    if (
+      /\b(12th|10th|high\s*school|secondary|higher\s*secondary|diploma|sslc|hsc)\b/i.test(clean)
+    ) {
+      return 'highschool';
+    }
+
+    return null;
+  }
+
+  /**
+   * Normalize notice period into standard category keys using word boundaries
+   */
+  function normalizeNoticePeriod(str) {
+    if (!str) return null;
+    const clean = String(str).toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!clean) return null;
+
+    if (
+      /\b(immediate|immediately|available\s*now|serving\s*notice|no\s*notice|0\s*days?|0\s*15|less\s*than\s*15)\b/i.test(clean)
+    ) {
+      return 'immediate';
+    }
+
+    if (/\b(15\s*days?|2\s*weeks?|15\s*30)\b/i.test(clean)) {
+      return '15days';
+    }
+
+    if (/\b(30\s*days?|1\s*months?|4\s*weeks?)\b/i.test(clean)) {
+      return '30days';
+    }
+
+    if (/\b(60\s*days?|2\s*months?|8\s*weeks?)\b/i.test(clean)) {
+      return '60days';
+    }
+
+    if (/\b(90\s*days?|3\s*months?|12\s*weeks?)\b/i.test(clean)) {
+      return '90days';
+    }
+
+    return null;
+  }
+
+  /**
+   * Normalize skill proficiency ratings into 4 standard levels
+   */
+  function normalizeProficiencyLevel(str) {
+    if (!str) return null;
+    const clean = String(str).toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!clean) return null;
+
+    if (/\b(beginner|basic|novice|elementary|1|0\s*1\s*year)\b/i.test(clean)) {
+      return 'beginner';
+    }
+
+    if (/\b(intermediate|medium|competent|moderate|2|3|2\s*3\s*years?)\b/i.test(clean)) {
+      return 'intermediate';
+    }
+
+    if (/\b(advanced|proficient|experienced|senior|4|4\s*5\s*years?)\b/i.test(clean)) {
+      return 'advanced';
+    }
+
+    if (/\b(expert|master|lead|5|5\s*\+\s*years?|6\s*\+\s*years?)\b/i.test(clean)) {
+      return 'expert';
+    }
+
+    return null;
+  }
+
+  function isProficiencyQuestion(text) {
+    if (!text) return false;
+    const t = String(text).toLowerCase();
+    return t.includes('proficiency') || t.includes('rate your') || t.includes('rating') || t.includes('skill level') || t.includes('how would you rate') || t.includes('level of expertise');
+  }
+
+  function isOfficeOrCommuteQuestion(text) {
+    if (!text) return false;
+    const t = String(text).toLowerCase();
+    return t.includes('office') || t.includes('work from') || t.includes('commute') || t.includes('relocate') || t.includes('on-site') || t.includes('hybrid') || t.includes('in-person') || t.includes('days/week') || t.includes('hyderabad');
+  }
+
   const SpeedFillMatcher = {
     matchField,
     getElementLabelText,
@@ -425,7 +584,12 @@
     getSearchInputs,
     extractSearchFillData,
     isIndeedPage,
-    setNativeInputValue
+    setNativeInputValue,
+    normalizeDegreeCategory,
+    normalizeNoticePeriod,
+    normalizeProficiencyLevel,
+    isProficiencyQuestion,
+    isOfficeOrCommuteQuestion
   };
 
   if (typeof window !== 'undefined') {
