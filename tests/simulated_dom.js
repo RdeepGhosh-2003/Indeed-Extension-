@@ -110,6 +110,12 @@ class SimulatedElement {
   matches(selector) {
     const sel = selector.trim();
 
+    if (sel.includes(':checked')) {
+      if (!this.checked) return false;
+      const baseSel = sel.replace(':checked', '');
+      return baseSel ? this.matches(baseSel) : true;
+    }
+
     // Comma separated selectors
     if (sel.includes(',')) {
       return sel.split(',').some(sub => this.matches(sub));
@@ -203,9 +209,22 @@ class SimulatedElement {
     return true;
   }
 
-  click() {
-    if (this.type === 'radio') {
-      this.checked = true;
+  addEventListener() {}
+  removeEventListener() {}
+
+  cloneNode(deep) {
+    const clone = new SimulatedElement(this.tagName, { ...this.attributes }, this._textContent);
+    if (deep) {
+      for (const child of this.children) {
+        clone.appendChild(child.cloneNode(true));
+      }
+    }
+    return clone;
+  }
+
+  remove() {
+    if (this.parentElement) {
+      this.parentElement.children = this.parentElement.children.filter(c => c !== this);
     }
   }
 }
@@ -221,6 +240,10 @@ class SimulatedDocument extends SimulatedElement {
     return new SimulatedElement(tagName);
   }
 
+  createTextNode(text) {
+    return new SimulatedElement('SPAN', {}, text);
+  }
+
   getElementById(id) {
     const results = this.querySelectorAll(`#${id}`);
     return results.length > 0 ? results[0] : null;
@@ -230,12 +253,19 @@ class SimulatedDocument extends SimulatedElement {
 function createDOM() {
   const doc = new SimulatedDocument();
   global.document = doc;
+  global.MutationObserver = class {
+    constructor(cb) { this.cb = cb; }
+    observe() {}
+    disconnect() {}
+  };
   global.window = {
     document: doc,
     location: { href: 'https://www.indeed.com/jobs?q=developer' },
     Event: function(type) { return { type }; },
     HTMLInputElement: { prototype: {} },
-    HTMLTextAreaElement: { prototype: {} }
+    HTMLTextAreaElement: { prototype: {} },
+    HTMLSelectElement: { prototype: {} },
+    MutationObserver: global.MutationObserver
   };
   return doc;
 }
