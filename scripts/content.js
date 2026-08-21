@@ -351,11 +351,6 @@
       if (selectedInput && !selectedInput.checked) {
         console.log('[Indeed SpeedFill] Auto-selecting radio option:', getRadioText(selectedInput, containerEl));
 
-        // RESTORE: Single targeted clicks to prevent React from toggling the custom radio OFF
-        const clickTarget = selectedInput.closest('label') || selectedInput.parentElement || selectedInput;
-        try { clickTarget.click(); } catch (e) {}
-        try { selectedInput.click(); } catch (e) {}
-
         const nativeRadioValueSetter = typeof window !== 'undefined' && window.HTMLInputElement ? Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked')?.set : null;
         if (nativeRadioValueSetter) {
           nativeRadioValueSetter.call(selectedInput, true);
@@ -366,9 +361,20 @@
         if (selectedInput._valueTracker) {
           selectedInput._valueTracker.setValue('');
         }
+        
         const EventClass = typeof window !== 'undefined' && window.Event ? window.Event : Event;
         selectedInput.dispatchEvent(new EventClass('input', { bubbles: true }));
         selectedInput.dispatchEvent(new EventClass('change', { bubbles: true }));
+
+        // Dispatch a single trusted MouseEvent to the label to trigger the visual React UI update
+        const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+        const label = selectedInput.id ? document.querySelector(`label[for="${CSS.escape(selectedInput.id)}"]`) : selectedInput.closest('label');
+        
+        if (label) {
+          label.dispatchEvent(clickEvent);
+        } else {
+          selectedInput.dispatchEvent(clickEvent);
+        }
 
         filledCount++;
       }
@@ -433,21 +439,25 @@
     const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer();
     if (!appContainer) return false;
 
-    // 1. Check for a VISIBLE resume header
+    // IRONCLAD ESCAPE HATCH: Strip newlines and spaces
+    const pageText = (document.body.textContent || '').toLowerCase().replace(/\s+/g, ' ');
+    if (pageText.includes('answer these questions') || pageText.includes('review your application') || pageText.includes('employer questions')) {
+      return false;
+    }
+
+    // Strict Resume Step Guard: MUST BE VISIBLE
     const headings = Array.from(appContainer.querySelectorAll('h1, h2, h3'));
     const visibleResumeHeading = headings.find(h => {
-      if (h.offsetWidth === 0 && h.offsetHeight === 0) return false; // MUST BE VISIBLE
+      if (h.offsetWidth === 0 && h.offsetHeight === 0) return false; // Ignore hidden React ghost elements
       const t = h.textContent.toLowerCase();
-      return (t.includes('resume') || t.includes('cv')) && !t.includes('review') && !t.includes('question');
+      return t.includes('resume') && !t.includes('review');
     });
-
     if (!visibleResumeHeading) return false;
 
-    // 2. Check for VISIBLE resume cards
     const potentialCards = Array.from(appContainer.querySelectorAll('[data-testid*="resume"], [class*="ResumeCard"], [class*="resume-card"], [class*="resume-option"], div[role="radio"]'));
 
     const resumeCards = potentialCards.filter(card => {
-      if (card.offsetWidth === 0 && card.offsetHeight === 0) return false; // MUST BE VISIBLE
+      if (card.offsetWidth === 0 && card.offsetHeight === 0) return false; // Ignore hidden cards
       const txt = card.textContent.toLowerCase();
       return txt.includes('.pdf') || txt.includes('.doc') || txt.includes('uploaded');
     });
