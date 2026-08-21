@@ -153,6 +153,10 @@
       const candidates = document.querySelectorAll(selector);
       for (const container of candidates) {
         if (!container) continue;
+        
+        // 🚨 THE HOLY GRAIL FIX: Completely ignore hidden Ghost Containers from previous React steps
+        if (container.offsetWidth === 0 && container.offsetHeight === 0) continue; 
+        
         if (isInsideExcludedContainer(container)) continue;
         if (container.querySelector(EXCLUDED_CHILD_FORMS) !== null) continue;
         return container;
@@ -169,12 +173,15 @@
       href.includes('ia.indeed.com')
     ) {
       const mainEl = document.querySelector('main, #ia-container, [role="main"], form');
-      return mainEl || document.body;
+      if (mainEl && (mainEl.offsetWidth > 0 || mainEl.offsetHeight > 0)) return mainEl;
+      return document.body;
     }
 
     // Fallback if application question elements exist on the page
     if (document.querySelector('.ia-Questions-item, [data-testid*="ia-"], .ia-BasePage, div[class*="ia-"]')) {
-      return document.querySelector('main, #ia-container, [role="main"]') || document.body;
+      const mainEl = document.querySelector('main, #ia-container, [role="main"]');
+      if (mainEl && (mainEl.offsetWidth > 0 || mainEl.offsetHeight > 0)) return mainEl;
+      return document.body;
     }
 
     return null;
