@@ -535,10 +535,7 @@
     const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer();
     if (!appContainer) return 0;
 
-    const inputs = appContainer.querySelectorAll(
-      'input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input:not([type]), textarea, select'
-    );
-
+    const inputs = appContainer.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input:not([type]), textarea, select');
     let unmatchedCount = 0;
 
     inputs.forEach(el => {
@@ -553,8 +550,6 @@
         if (!match || !match.value) {
           unmatchedCount++;
           el.classList.add('speedfill-warning');
-          // Automatically render save button
-          if (typeof injectSaveButton === 'function') injectSaveButton(el);
         }
       } else {
         el.classList.remove('speedfill-warning');
@@ -572,8 +567,6 @@
         if (!radios.some(r => r.checked)) {
           unmatchedCount++;
           container.classList.add('speedfill-warning');
-          // Automatically render save button for empty radio groups
-          if (typeof injectSaveButton === 'function') injectSaveButton(container, radios[0]);
         } else {
           container.classList.remove('speedfill-warning');
         }
@@ -707,36 +700,24 @@
   }
 
   function handleUserManualInput(e) {
-    // If triggered by a browser event, enforce the human-click rule to prevent loops.
-    // BUT allow programmatic calls (where e is undefined) to pass through.
     if (e && !e.isTrusted) return;
 
-    if (e && e.target && e.target.tagName && !e.target.dataset.speedfillSaveInjected) {
-      const el = e.target;
-      if (el.tagName.toLowerCase() === 'input' || el.tagName.toLowerCase() === 'textarea' || el.tagName.toLowerCase() === 'select') {
+    const el = e.target;
+    if (!el) return;
 
-        // FILTER: Do not inject on global search inputs
-        if (window.SpeedFillMatcher?.isSearchInput && window.SpeedFillMatcher.isSearchInput(el)) {
-          return;
-        }
+    // 1. LOCKDOWN: Mark field as user-edited so auto-fill stops fighting the user forever
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+      el.dataset.speedfillUserEdited = 'true';
+    }
+    const wrapper = el.closest('[class*="FormGroup"], .ia-Questions-item');
+    if (wrapper) wrapper.dataset.speedfillUserEdited = 'true';
 
-        // FILTER: If this is a standard recognized field, DO NOT inject the Q&A save button.
-        if (el.type !== 'radio') {
-          const match = window.SpeedFillMatcher?.matchField(el, userProfile);
-          if (match !== null && match !== undefined) {
-            return;
-          }
-        }
-
-        if (el.type !== 'radio' && el.type !== 'checkbox') {
-          if (!el.value) return; // Don't inject if they just cleared it
-          injectSaveButton(el);
-        } else if (el.type === 'radio') {
-          const container = el.closest('fieldset, [role="radiogroup"], .ia-Questions-item, div[class*="Question"], div[class*="FormGroup"]') || el.parentElement.parentElement;
-          if (container && !container.dataset.speedfillSaveInjected) {
-            injectSaveButton(container, el);
-          }
-        }
+    // 2. INJECT SAVE BUTTON: Support standard inputs and custom React dropdowns
+    if (!window.SpeedFillMatcher?.isSearchInput(el)) {
+      if (wrapper && !wrapper.dataset.speedfillSaveInjected) {
+         setTimeout(() => injectSaveButton(wrapper, el.tagName === 'INPUT' ? el : null), 200);
+      } else if (el.type !== 'radio' && el.type !== 'checkbox' && el.tagName !== 'DIV' && !el.dataset.speedfillSaveInjected) {
+         setTimeout(() => injectSaveButton(el), 200);
       }
     }
 
@@ -746,11 +727,9 @@
     const remainingUnmatched = checkUnmatchedUnfilledFields(appContainer);
     updatePillStatus(remainingUnmatched, 0);
 
-    // If remaining unmatched fields reach 0, auto-advance step!
     if (remainingUnmatched === 0 && userProfile?.settings?.autoAdvanceStep !== false) {
       const hasUnsaved = appContainer.querySelectorAll('.speedfill-save-btn:not(.saved)').length > 0;
       if (hasUnsaved) {
-        console.log('[Indeed SpeedFill] Pausing auto-advance to allow user to save new Q&A.');
         const pill = document.getElementById('speedfill-floating-pill');
         if (pill) {
           pill.classList.add('pill-warning');
@@ -758,8 +737,6 @@
         }
         return;
       }
-
-      console.log('[Indeed SpeedFill] All missing fields completed by user! Auto-advancing step...');
       const delay = userProfile?.settings?.stepDelayMs || 500;
       clearTimeout(window._speedfillAdvanceTimer);
       window._speedfillAdvanceTimer = setTimeout(() => clickContinueButton(appContainer), delay);
@@ -951,9 +928,11 @@
     inputs.forEach(input => {
       if (input.offsetWidth === 0 && input.offsetHeight === 0) return;
       if (window.SpeedFillMatcher?.isNonApplicationInput(input)) return;
-      
-      // 🛡️ NEW GUARD: Do not aggressively overwrite if the user is actively typing in the box!
-      if (document.activeElement === input) return;
+
+      // IRONCLAD GUARD: Do not overwrite if user is typing or has ever edited this field
+      if (document.activeElement === input || input.dataset.speedfillUserEdited === 'true') return;
+      const wrapper = input.closest('[class*="FormGroup"], .ia-Questions-item');
+      if (wrapper && wrapper.dataset.speedfillUserEdited === 'true') return;
 
       const match = window.SpeedFillMatcher?.matchField(input, userProfile);
       if (match && match.value) {
