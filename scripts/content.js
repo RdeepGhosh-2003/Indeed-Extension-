@@ -439,25 +439,25 @@
     const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer();
     if (!appContainer) return false;
 
-    // IRONCLAD ESCAPE HATCH: Strip newlines and spaces
-    const pageText = (document.body.textContent || '').toLowerCase().replace(/\s+/g, ' ');
-    if (pageText.includes('answer these questions') || pageText.includes('review your application') || pageText.includes('employer questions')) {
+    // 🚨 THE ULTIMATE PHYSICAL GUARD: If there are radio buttons, text areas, or dropdowns
+    // anywhere on the screen, we are physically on a Q&A page. Abort the Resume check instantly!
+    const hasQAElements = appContainer.querySelector('input[type="radio"], textarea, select, .ia-Questions');
+    if (hasQAElements) {
       return false;
     }
 
-    // Strict Resume Step Guard: MUST BE VISIBLE
     const headings = Array.from(appContainer.querySelectorAll('h1, h2, h3'));
     const visibleResumeHeading = headings.find(h => {
-      if (h.offsetWidth === 0 && h.offsetHeight === 0) return false; // Ignore hidden React ghost elements
+      if (h.offsetWidth === 0 && h.offsetHeight === 0) return false; 
       const t = h.textContent.toLowerCase();
       return t.includes('resume') && !t.includes('review');
     });
     if (!visibleResumeHeading) return false;
 
-    const potentialCards = Array.from(appContainer.querySelectorAll('[data-testid*="resume"], [class*="ResumeCard"], [class*="resume-card"], [class*="resume-option"], div[role="radio"]'));
+    const potentialCards = Array.from(appContainer.querySelectorAll('[data-testid*="resume"], [class*="ResumeCard"], [class*="resume-card"], [class*="resume-option"]'));
 
     const resumeCards = potentialCards.filter(card => {
-      if (card.offsetWidth === 0 && card.offsetHeight === 0) return false; // Ignore hidden cards
+      if (card.offsetWidth === 0 && card.offsetHeight === 0) return false; 
       const txt = card.textContent.toLowerCase();
       return txt.includes('.pdf') || txt.includes('.doc') || txt.includes('uploaded');
     });
