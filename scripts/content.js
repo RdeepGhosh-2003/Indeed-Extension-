@@ -951,6 +951,9 @@
     inputs.forEach(input => {
       if (input.offsetWidth === 0 && input.offsetHeight === 0) return;
       if (window.SpeedFillMatcher?.isNonApplicationInput(input)) return;
+      
+      // 🛡️ NEW GUARD: Do not aggressively overwrite if the user is actively typing in the box!
+      if (document.activeElement === input) return;
 
       const match = window.SpeedFillMatcher?.matchField(input, userProfile);
       if (match && match.value) {
