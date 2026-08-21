@@ -346,7 +346,32 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load Applied Jobs Logs
   function loadLogs() {
     chrome.storage.local.get(['appliedJobs'], (result) => {
-      const logs = result.appliedJobs || [];
+      let rawLogs = result.appliedJobs || [];
+      
+      // 1. Filter out garbage strings
+      const validLogs = rawLogs.filter(log => typeof log === 'object' && log !== null && log.date && log.title);
+      
+      // 2. DEDUPLICATE: Remove the hundreds of identical logs caused by the infinite loop
+      const uniqueLogs = [];
+      const seenKeys = new Set();
+      
+      validLogs.forEach(log => {
+        // Create a unique key using the Title, Company, and the Day of application
+        const dateStr = log.date.substring(0, 10);
+        const key = `${log.title}-${log.company}-${dateStr}`;
+        
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniqueLogs.push(log);
+        }
+      });
+      
+      // 3. Permanently save the cleaned, deduplicated database
+      if (rawLogs.length !== uniqueLogs.length) {
+        chrome.storage.local.set({ appliedJobs: uniqueLogs });
+      }
+
+      const logs = uniqueLogs;
       document.getElementById('total-applications-count').textContent = logs.length;
       
       // Calculate Stats
@@ -363,14 +388,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
       logs.forEach(log => {
         if (!log.date) return;
-        // Parse "M/D/YYYY" from either "M/D/YYYY" or "M/D/YYYY, h:mm PM"
-        const dateStr = log.date.split(',')[0].trim();
-        const parts = dateStr.split('/');
-        if (parts.length === 3) {
-           const logDate = new Date(parseInt(parts[2], 10), parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
-           if (logDate >= today) todayCount++;
-           if (logDate >= weekStart) weekCount++;
-           if (logDate >= monthStart) monthCount++;
+        let logDate = new Date(log.date);
+        if (isNaN(logDate.getTime())) {
+          const dateStr = log.date.split(',')[0].trim();
+          const parts = dateStr.split('/');
+          if (parts.length === 3) {
+             logDate = new Date(parseInt(parts[2], 10), parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
+          }
+        }
+        if (!isNaN(logDate.getTime())) {
+           const cleanLogDate = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate());
+           if (cleanLogDate >= today) todayCount++;
+           if (cleanLogDate >= weekStart) weekCount++;
+           if (cleanLogDate >= monthStart) monthCount++;
         }
       });
 
@@ -396,10 +426,17 @@ document.addEventListener('DOMContentLoaded', () => {
           let count = 0;
           logs.forEach(log => {
             if (!log.date) return;
-            const parts = log.date.split(',')[0].trim().split('/');
-            if (parts.length === 3) {
-               const logDate = new Date(parseInt(parts[2], 10), parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
-               if (logDate.getTime() === targetDate.getTime()) {
+            let logDate = new Date(log.date);
+            if (isNaN(logDate.getTime())) {
+              const dateStr = log.date.split(',')[0].trim();
+              const parts = dateStr.split('/');
+              if (parts.length === 3) {
+                 logDate = new Date(parseInt(parts[2], 10), parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
+              }
+            }
+            if (!isNaN(logDate.getTime())) {
+               const cleanLogDate = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate());
+               if (cleanLogDate.getTime() === targetDate.getTime()) {
                  count++;
                }
             }
