@@ -537,34 +537,45 @@
 
     let unmatchedCount = 0;
 
+    // 🛡️ GLOBAL TYPING GUARD: Pause if user is typing OR navigating a dropdown list
     const activeEl = document.activeElement;
-    if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName) && appContainer.contains(activeEl)) {
+    if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(activeEl.tagName) && appContainer.contains(activeEl)) {
        unmatchedCount++;
     }
 
+    // 1. Standard Inputs
     const inputs = appContainer.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input:not([type]), textarea, select');
-
     inputs.forEach(el => {
       if ((el.offsetWidth === 0 && el.offsetHeight === 0) || el.disabled || el.readOnly) return;
       if (window.SpeedFillMatcher?.isNonApplicationInput(el)) return;
 
       const isSelect = el.tagName.toLowerCase() === 'select';
-      
-      // SAFEGUARD: Ensure el.value is a string before trimming to prevent TypeErrors
       const valStr = el.value !== null && el.value !== undefined ? String(el.value) : '';
       const isValEmpty = isSelect ? !el.value : !valStr.trim();
 
       if (isValEmpty) {
         unmatchedCount++;
         const match = window.SpeedFillMatcher?.matchField(el, userProfile);
-        if (!match || !match.value) {
-          el.classList.add('speedfill-warning');
-        }
+        if (!match || !match.value) el.classList.add('speedfill-warning');
       } else {
         el.classList.remove('speedfill-warning');
       }
     });
 
+    // 2. Custom React Dropdowns (Catches hidden native selects by checking the visible button text)
+    const customDropdowns = appContainer.querySelectorAll('button[aria-haspopup="listbox"], [role="combobox"]');
+    customDropdowns.forEach(dropdown => {
+      if (dropdown.offsetWidth === 0 && dropdown.offsetHeight === 0) return;
+      const text = (dropdown.textContent || '').toLowerCase().trim();
+      if (text.includes('select ') || text === 'select' || text.includes('choose ')) {
+        unmatchedCount++;
+        dropdown.classList.add('speedfill-warning');
+      } else {
+        dropdown.classList.remove('speedfill-warning');
+      }
+    });
+
+    // 3. Radio Groups
     const radioContainers = appContainer.querySelectorAll('fieldset, [role="radiogroup"], .ia-Questions-item');
     radioContainers.forEach(container => {
       if (window.SpeedFillMatcher?.isInsideExcludedContainer(container)) return;
@@ -777,7 +788,7 @@
 
     const buttons = Array.from(appContainer.querySelectorAll('button, a[role="button"], input[type="submit"]'));
     const submitBtn = buttons.find(b => {
-      if (window.SpeedFillMatcher?.isNonApplicationInput(b)) return false;
+      if (b.offsetWidth === 0 && b.offsetHeight === 0) return false; // MUST BE VISIBLE
       const text = b.textContent.toLowerCase().trim();
       const isDisabled = b.disabled || b.getAttribute('aria-disabled') === 'true' || b.classList.contains('disabled');
       return (
@@ -797,7 +808,6 @@
           date: new Date().toISOString()
         }
       });
-
       submitBtn.click();
       return true;
     }
@@ -894,7 +904,6 @@
     const buttons = Array.from(appContainer.querySelectorAll('button, a[role="button"]'));
     const continueBtn = buttons.find(b => {
       if (b.offsetWidth === 0 && b.offsetHeight === 0) return false; // MUST BE VISIBLE
-      if (window.SpeedFillMatcher?.isNonApplicationInput(b)) return false;
       const text = b.textContent.toLowerCase().trim();
       const isDisabled = b.disabled || b.getAttribute('aria-disabled') === 'true';
       return (text === 'continue' || text.includes('continue') || text.includes('next') || text.includes('review your application')) && !isDisabled;
