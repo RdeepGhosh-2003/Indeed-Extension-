@@ -537,7 +537,6 @@
 
     let unmatchedCount = 0;
 
-    // 🛡️ GLOBAL TYPING GUARD: Instantly pause auto-advance if the user is actively typing
     const activeEl = document.activeElement;
     if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName) && appContainer.contains(activeEl)) {
        unmatchedCount++;
@@ -550,10 +549,12 @@
       if (window.SpeedFillMatcher?.isNonApplicationInput(el)) return;
 
       const isSelect = el.tagName.toLowerCase() === 'select';
-      const isValEmpty = isSelect ? !el.value : !el.value.trim();
+      
+      // SAFEGUARD: Ensure el.value is a string before trimming to prevent TypeErrors
+      const valStr = el.value !== null && el.value !== undefined ? String(el.value) : '';
+      const isValEmpty = isSelect ? !el.value : !valStr.trim();
 
       if (isValEmpty) {
-        // ALWAYS count empty fields as unmatched to prevent auto-advancing past them!
         unmatchedCount++;
         const match = window.SpeedFillMatcher?.matchField(el, userProfile);
         if (!match || !match.value) {
@@ -863,14 +864,19 @@
       if (!appContainer) return;
 
       if (userProfile?.settings?.autoSubmitApplication !== false) {
-        if (userProfile?.settings?.pauseOnUnmatchedFields !== false) {
-          const unmatched = checkUnmatchedUnfilledFields(appContainer);
-          if (unmatched > 0) return;
-        }
-
+        
+        // 🚀 ULTIMATE FIX: Try to submit FIRST. If Indeed enabled the submit button, 
+        // the application is valid. We bypass unfilled field guards for the final click.
         const submitted = clickSubmitButton(appContainer);
         if (submitted) {
           clearInterval(window._captchaMonitorInterval);
+          return;
+        }
+
+        // If no submit button is ready, enforce standard pause guards for intermediate steps
+        if (userProfile?.settings?.pauseOnUnmatchedFields !== false) {
+          const unmatched = checkUnmatchedUnfilledFields(appContainer);
+          if (unmatched > 0) return;
         }
       }
     }, 100); // Super-fast 100ms interval for lightning fast auto-submit

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Indeed SpeedFill Auto-Fill Engine",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Ultra-fast auto-filler and Search Fill assistant for Indeed job search and application forms.",
   "permissions": [
     "storage",
