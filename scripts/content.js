@@ -535,8 +535,15 @@
     const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer();
     if (!appContainer) return 0;
 
-    const inputs = appContainer.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input:not([type]), textarea, select');
     let unmatchedCount = 0;
+
+    // 🛡️ GLOBAL TYPING GUARD: Instantly pause auto-advance if the user is actively typing
+    const activeEl = document.activeElement;
+    if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName) && appContainer.contains(activeEl)) {
+       unmatchedCount++;
+    }
+
+    const inputs = appContainer.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input:not([type]), textarea, select');
 
     inputs.forEach(el => {
       if ((el.offsetWidth === 0 && el.offsetHeight === 0) || el.disabled || el.readOnly) return;
@@ -546,9 +553,10 @@
       const isValEmpty = isSelect ? !el.value : !el.value.trim();
 
       if (isValEmpty) {
+        // ALWAYS count empty fields as unmatched to prevent auto-advancing past them!
+        unmatchedCount++;
         const match = window.SpeedFillMatcher?.matchField(el, userProfile);
         if (!match || !match.value) {
-          unmatchedCount++;
           el.classList.add('speedfill-warning');
         }
       } else {

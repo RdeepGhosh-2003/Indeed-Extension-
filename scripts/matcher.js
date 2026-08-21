@@ -439,14 +439,18 @@
   function setNativeInputValue(input, value) {
     if (!input || value === undefined || value === null) return false;
     const valueStr = String(value);
-
-    // BUG FIX: Skip (return false) if the value is already set — prevents inflated
-    // filledCount that caused the Q&A step to auto-advance before radios were filled.
     if (input.value === valueStr) return false;
 
-    const prototype = (typeof window !== 'undefined' && window.HTMLInputElement && window.HTMLInputElement.prototype)
-      ? window.HTMLInputElement.prototype
-      : (typeof HTMLInputElement !== 'undefined' ? HTMLInputElement.prototype : null);
+    let prototype = null;
+    if (typeof window !== 'undefined') {
+      if (input.tagName === 'TEXTAREA' && window.HTMLTextAreaElement) {
+        prototype = window.HTMLTextAreaElement.prototype;
+      } else if (input.tagName === 'SELECT' && window.HTMLSelectElement) {
+        prototype = window.HTMLSelectElement.prototype;
+      } else if (window.HTMLInputElement) {
+        prototype = window.HTMLInputElement.prototype;
+      }
+    }
     
     const descriptor = prototype ? Object.getOwnPropertyDescriptor(prototype, 'value') : null;
     const setter = descriptor ? descriptor.set : null;
