@@ -4,7 +4,7 @@
  * handles radio groups, CAPTCHA alerts, and interactive auto-advance.
  */
 
-(function() {
+(function () {
   let userProfile = null;
   let isObserverActive = false;
   let hasNotifiedCaptcha = false;
@@ -38,66 +38,12 @@
     }
   });
 
-  /**
-   * Inject value into React input control safely
-   */
-  function setReactInputValue(el, value) {
-    if (!el || value === undefined || value === null) return false;
 
-    // Skip if disabled, readOnly, manually edited, or already filled
-    if (
-      el.disabled || 
-      el.readOnly || 
-      el.dataset.speedfillUserEdited === 'true' || 
-      el.value === String(value)
-    ) {
-      return false;
-    }
-
-    // Attach listener to track manual user edits
-    if (!el.dataset.speedfillListenerAttached) {
-      el.addEventListener('input', (e) => {
-        if (e.isTrusted) {
-          el.dataset.speedfillUserEdited = 'true';
-        }
-      });
-      el.dataset.speedfillListenerAttached = 'true';
-    }
-
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype, 'value'
-    )?.set;
-
-    const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLTextAreaElement.prototype, 'value'
-    )?.set;
-
-    const isTextArea = el.tagName.toLowerCase() === 'textarea';
-    const setter = isTextArea ? nativeTextAreaValueSetter : nativeInputValueSetter;
-
-    if (setter) {
-      setter.call(el, String(value));
-    } else {
-      el.value = String(value);
-    }
-
-    // Dispatch synthetic React state events
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    el.dispatchEvent(new Event('blur', { bubbles: true }));
-
-    // Visual emerald feedback glow
-    if (userProfile?.settings?.highlightFilledFields !== false) {
-      el.classList.remove('speedfill-warning');
-      el.classList.add('speedfill-highlight');
-      setTimeout(() => el.classList.remove('speedfill-highlight'), 2500);
-    }
-
-    return true;
-  }
 
   /**
    * Handle dropdown select elements
+  /**
+   * Handle dropdown select elements with smart fuzzy, degree, notice period & proficiency matching
    */
   function setSelectValue(selectEl, value) {
     if (!selectEl || !value) return false;
@@ -110,18 +56,77 @@
 
     let matchedOption = null;
 
+    // 1. Exact or Substring match
     for (const option of selectEl.options) {
       const optText = (option.textContent || '').toLowerCase().trim();
       const optVal = (option.value || '').toLowerCase().trim();
-
       if (!optText && !optVal) continue;
+      // Skip empty or placeholder option values for substring containment checks
+      if (optVal === '' && optText.includes('select')) continue;
 
-      const matchesText = optText && (optText === targetVal || optText.includes(targetVal) || targetVal.includes(optText));
-      const matchesVal = optVal && (optVal === targetVal || optVal.includes(targetVal) || targetVal.includes(optVal));
+      const isExactMatch = (optText && optText === targetVal) || (optVal && optVal === targetVal);
+      const isSubMatch = (optText && optText.includes(targetVal)) ||
+        (optVal && optVal.includes(targetVal)) ||
+        (optVal && optVal.length > 2 && targetVal.includes(optVal)) ||
+        (optText && optText.length > 3 && !optText.includes('select') && targetVal.includes(optText));
 
-      if (matchesText || matchesVal) {
+      if (isExactMatch || isSubMatch) {
         matchedOption = option;
         break;
+      }
+    }
+
+    // 2. Keyword / Token Intersection match (e.g. "Bachelor of Science" matches "Bachelor's Degree")
+    if (!matchedOption) {
+      const targetTokens = targetVal.split(/\s+/).filter(t => t.length > 2);
+      for (const option of selectEl.options) {
+        const optText = (option.textContent || '').toLowerCase().trim();
+        if (targetTokens.some(tok => optText.includes(tok))) {
+          matchedOption = option;
+          break;
+        }
+      }
+    }
+
+    // 3. Degree / Qualification Equivalence Match (e.g. "B.Tech" matches "Bachelor's Degree")
+    if (!matchedOption && window.SpeedFillMatcher?.normalizeDegreeCategory) {
+      const targetCategory = window.SpeedFillMatcher.normalizeDegreeCategory(targetVal);
+      if (targetCategory) {
+        for (const option of selectEl.options) {
+          const optText = (option.textContent || '').toLowerCase().trim();
+          if (window.SpeedFillMatcher.normalizeDegreeCategory(optText) === targetCategory) {
+            matchedOption = option;
+            break;
+          }
+        }
+      }
+    }
+
+    // 4. Notice Period Equivalence Match (e.g. "30 Days" matches "1 Month")
+    if (!matchedOption && window.SpeedFillMatcher?.normalizeNoticePeriod) {
+      const targetNotice = window.SpeedFillMatcher.normalizeNoticePeriod(targetVal);
+      if (targetNotice) {
+        for (const option of selectEl.options) {
+          const optText = (option.textContent || '').toLowerCase().trim();
+          if (window.SpeedFillMatcher.normalizeNoticePeriod(optText) === targetNotice) {
+            matchedOption = option;
+            break;
+          }
+        }
+      }
+    }
+
+    // 5. Proficiency Level Match (e.g. "3+ years" matches "Advanced" / "Intermediate")
+    if (!matchedOption && window.SpeedFillMatcher?.normalizeProficiencyLevel) {
+      const targetProf = window.SpeedFillMatcher.normalizeProficiencyLevel(targetVal);
+      if (targetProf) {
+        for (const option of selectEl.options) {
+          const optText = (option.textContent || '').toLowerCase().trim();
+          if (window.SpeedFillMatcher.normalizeProficiencyLevel(optText) === targetProf) {
+            matchedOption = option;
+            break;
+          }
+        }
       }
     }
 
@@ -144,7 +149,7 @@
   }
 
   /**
-   * Smart Radio Button Group Handler for Location, Commute/Relocation, & Yes/No Screening Questions
+   * Smart Radio Button Group Handler for Location, Commute/Relocation, Yes/No, Proficiency, Qualification & Custom Screening Questions
    */
   function handleRadioGroups(containerArg) {
     if (!userProfile) return 0;
@@ -154,77 +159,217 @@
     let filledCount = 0;
     const userCity = (userProfile.personal?.city || '').toLowerCase().trim();
 
-    // Find radio group containers within application container
-    const containers = containerEl.querySelectorAll('fieldset, [role="radiogroup"], .ia-Questions-item, div[class*="Question"]');
+    const containers = containerEl.querySelectorAll('fieldset, [role="radiogroup"], .ia-Questions-item, div[class*="Question"], div[class*="FormGroup"]');
 
     containers.forEach(container => {
       if (window.SpeedFillMatcher?.isInsideExcludedContainer(container)) return;
 
-      // Find question header text
-      const headerEl = container.querySelector('legend, h1, h2, h3, h4, label, [class*="label"], [class*="header"]');
-      const questionText = headerEl ? headerEl.textContent.toLowerCase().trim() : container.textContent.toLowerCase().trim();
+      // Extract Question Title
+      let questionText = '';
+      const cAriaLabelledBy = container.getAttribute('aria-labelledby');
+      if (cAriaLabelledBy) {
+        const target = document.getElementById(cAriaLabelledBy);
+        if (target && target.textContent) questionText = target.textContent.toLowerCase().trim();
+      }
 
-      // Find radio options inside this container
+      if (!questionText) {
+        let headerEl = container.querySelector('legend, h1, h2, h3, h4, [id$="-label"]');
+        if (!headerEl) {
+          headerEl = Array.from(container.querySelectorAll('[class*="label"], [class*="Label"], [class*="header"], [class*="Header"], [class*="title"], [class*="Title"], [class*="question"], [class*="Question"], p, span'))
+            .find(el => !el.querySelector('input[type="radio"]') && !el.closest('label:has(input)'));
+        }
+        if (headerEl) {
+          questionText = headerEl.textContent.toLowerCase().trim();
+        } else {
+          const clone = container.cloneNode(true);
+          clone.querySelectorAll('input, .speedfill-save-btn').forEach(el => el.remove());
+          clone.querySelectorAll('label').forEach(lbl => {
+            if (lbl.querySelector('input') || lbl.getAttribute('for')) lbl.remove();
+          });
+          questionText = clone.textContent.toLowerCase().replace(/\s+/g, ' ').trim();
+        }
+      }
+
       const radioInputs = Array.from(container.querySelectorAll('input[type="radio"]'));
       if (radioInputs.length === 0) return;
-
-      // Skip if any radio input is a non-application input
       if (radioInputs.some(r => window.SpeedFillMatcher?.isNonApplicationInput(r))) return;
-
-      // Skip if a radio option is already selected
-      const isAlreadySelected = radioInputs.some(r => r.checked);
-      if (isAlreadySelected) return;
+      if (radioInputs.some(r => r.checked)) return;
 
       let selectedInput = null;
 
-      // 1. Are you located in [City]?
-      if (questionText.includes('are you located in') || questionText.includes('live in') || questionText.includes('based in') || questionText.includes('reside in')) {
-        const questionMentionsUserCity = userCity ? questionText.includes(userCity) : false;
+      // 1. Skill Proficiency Rating Questions (e.g. "How would you rate your SQL proficiency?")
+      if (!selectedInput && window.SpeedFillMatcher?.isProficiencyQuestion(questionText)) {
+        let profLevel = null;
 
+        // Check if screening QA bank has an entry for this skill
+        if (userProfile.screening && Array.isArray(userProfile.screening)) {
+          const cleanQ = questionText.replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+          for (const item of userProfile.screening) {
+            if (!item.keywords || !item.answer) continue;
+            const kws = item.keywords.toLowerCase().split(/[,/|]/).map(k => k.trim());
+            const isMatch = kws.some(kw => kw && (cleanQ.includes(kw) || kw.includes(cleanQ)));
+            if (isMatch) {
+              profLevel = window.SpeedFillMatcher.normalizeProficiencyLevel(item.answer);
+              if (profLevel) break;
+            }
+          }
+        }
+
+        // Fallback to profile default proficiency setting or Intermediate / Advanced
+        if (!profLevel) {
+          profLevel = window.SpeedFillMatcher?.normalizeProficiencyLevel(userProfile.work?.defaultProficiency || 'Intermediate') || 'intermediate';
+        }
+
+        selectedInput = radioInputs.find(r => {
+          const optText = getRadioText(r, containerEl);
+          return window.SpeedFillMatcher?.normalizeProficiencyLevel(optText) === profLevel;
+        }) || radioInputs.find(r => {
+          const optText = getRadioText(r, containerEl);
+          return optText.includes('intermediate') || optText.includes('advanced') || optText.includes('expert');
+        });
+      }
+
+      // 2. Location / Residence Questions
+      if (!selectedInput && (questionText.includes('are you located in') || questionText.includes('live in') || questionText.includes('based in') || questionText.includes('reside in'))) {
+        const questionMentionsUserCity = userCity ? questionText.includes(userCity) : false;
         if (questionMentionsUserCity) {
-          // User IS located here -> Click "Yes"
           selectedInput = radioInputs.find(r => getRadioText(r, containerEl).includes('yes'));
         } else {
-          // User IS NOT located here -> Click "No"
           selectedInput = radioInputs.find(r => getRadioText(r, containerEl).includes('no'));
         }
       }
 
-      // 2. Will you be able to reliably commute or relocate to [City]...?
-      else if (questionText.includes('commute or relocate') || questionText.includes('relocate') || questionText.includes('commute to')) {
-        // Preferred option: "Yes, I am planning to relocate" OR "Yes, I can make the commute"
+      // 3. Commute / Relocation / Office Work / Hybrid Questions
+      if (!selectedInput && window.SpeedFillMatcher?.isOfficeOrCommuteQuestion(questionText)) {
         selectedInput = radioInputs.find(r => {
           const txt = getRadioText(r, containerEl);
-          return txt.includes('planning to relocate') || txt.includes('make the commute') || txt.includes('yes');
+          return txt.includes('planning to relocate') || txt.includes('make the commute') || txt.includes('yes') || txt === 'yes';
         });
       }
 
-      // 3. Q&A Bank Matching for other screening questions
-      else if (userProfile.screening && Array.isArray(userProfile.screening)) {
-        const cleanQuestionText = questionText.replace(/[^a-z0-9 ]/g, '');
+      // 4. Education / Degree Questions (e.g. "What is your highest qualification?")
+      if (!selectedInput && (questionText.includes('qualification') || questionText.includes('degree') || questionText.includes('education'))) {
+        const userDegree = userProfile.education?.degree || '';
+        const targetCategory = window.SpeedFillMatcher?.normalizeDegreeCategory(userDegree);
+        if (targetCategory) {
+          selectedInput = radioInputs.find(r => {
+            const optText = getRadioText(r, containerEl);
+            return window.SpeedFillMatcher?.normalizeDegreeCategory(optText) === targetCategory;
+          });
+        }
+      }
+
+      // 5. Notice Period / Availability Questions
+      if (!selectedInput && (questionText.includes('notice') || questionText.includes('how soon') || questionText.includes('availability'))) {
+        const userNotice = userProfile.work?.targetRole?.noticePeriod || '30 Days';
+        const targetNotice = window.SpeedFillMatcher?.normalizeNoticePeriod(userNotice);
+        if (targetNotice) {
+          selectedInput = radioInputs.find(r => {
+            const optText = getRadioText(r, containerEl);
+            return window.SpeedFillMatcher?.normalizeNoticePeriod(optText) === targetNotice;
+          });
+        }
+      }
+
+      // 6. Check Standard Profile Field Mappings (e.g. Notice Period, Degree, Years Experience)
+      if (!selectedInput) {
+        const fieldMatch = window.SpeedFillMatcher?.matchField(container, userProfile);
+        if (fieldMatch && fieldMatch.value) {
+          const targetVal = String(fieldMatch.value).toLowerCase().trim();
+          selectedInput = radioInputs.find(r => {
+            const optionText = getRadioText(r, containerEl);
+            return optionText === targetVal || optionText.includes(targetVal) || targetVal.includes(optionText);
+          });
+        }
+      }
+
+      // 7. Q&A Bank Matching for other screening questions
+      if (!selectedInput && userProfile.screening && Array.isArray(userProfile.screening)) {
+        const cleanQuestionText = questionText.replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+
         for (const item of userProfile.screening) {
-          // Split by comma, slash, or pipe to handle cases like "Zip/Postal Code" -> "zip", "postal code"
-          const keywords = item.keywords.toLowerCase().split(/[,/|]/).map(k => k.trim().replace(/[^a-z0-9 ]/g, ''));
-          for (const kw of keywords) {
-            if (kw && (cleanQuestionText.includes(kw) || questionText.includes(kw))) {
-              const ans = item.answer.toLowerCase();
-              if (ans.includes('yes') || ans.includes('true')) {
-                selectedInput = radioInputs.find(r => getRadioText(r, containerEl).includes('yes'));
-              } else if (ans.includes('no') || ans.includes('false')) {
-                selectedInput = radioInputs.find(r => getRadioText(r, containerEl).includes('no'));
+          if (!item.keywords || !item.answer) continue;
+
+          const keywords = item.keywords.toLowerCase().split(/[,/|]/).map(k => k.trim());
+          const isMatched = keywords.some(rawKw => {
+            const kw = rawKw.replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+            if (!kw) return false;
+            if (cleanQuestionText.includes(kw) || questionText.includes(kw) || kw.includes(cleanQuestionText)) return true;
+            const kwTokens = kw.split(' ').filter(t => t.length > 2 && !['what', 'your', 'with', 'have', 'from', 'this', 'that', 'rate', 'how', 'are', 'you'].includes(t));
+            return kwTokens.length > 0 && kwTokens.every(tok => cleanQuestionText.includes(tok) || questionText.includes(tok));
+          });
+
+          if (isMatched) {
+            const targetAns = item.answer.toLowerCase().trim();
+
+            // Match specific dynamic text (e.g., "Intermediate", "Expert", "30 Days", "Immediate")
+            selectedInput = radioInputs.find(r => {
+              const optionText = getRadioText(r, containerEl);
+              return optionText === targetAns || optionText.includes(targetAns) || targetAns.includes(optionText);
+            });
+
+            // Normalizers fallback
+            if (!selectedInput && window.SpeedFillMatcher?.normalizeDegreeCategory) {
+              const degreeCat = window.SpeedFillMatcher.normalizeDegreeCategory(targetAns);
+              if (degreeCat) {
+                selectedInput = radioInputs.find(r => window.SpeedFillMatcher.normalizeDegreeCategory(getRadioText(r, containerEl)) === degreeCat);
               }
-              break;
             }
-            break;
+            if (!selectedInput && window.SpeedFillMatcher?.normalizeNoticePeriod) {
+              const noticeCat = window.SpeedFillMatcher.normalizeNoticePeriod(targetAns);
+              if (noticeCat) {
+                selectedInput = radioInputs.find(r => window.SpeedFillMatcher.normalizeNoticePeriod(getRadioText(r, containerEl)) === noticeCat);
+              }
+            }
+            if (!selectedInput && window.SpeedFillMatcher?.normalizeProficiencyLevel) {
+              const profCat = window.SpeedFillMatcher.normalizeProficiencyLevel(targetAns);
+              if (profCat) {
+                selectedInput = radioInputs.find(r => window.SpeedFillMatcher.normalizeProficiencyLevel(getRadioText(r, containerEl)) === profCat);
+              }
+            }
+
+            // Fallback for standard Yes/No questions
+            if (!selectedInput) {
+              if (targetAns.includes('yes') || targetAns.includes('true')) {
+                selectedInput = radioInputs.find(r => getRadioText(r, containerEl).includes('yes') || getRadioText(r, containerEl) === 'yes');
+              } else if (targetAns.includes('no') || targetAns.includes('false')) {
+                selectedInput = radioInputs.find(r => getRadioText(r, containerEl).includes('no') || getRadioText(r, containerEl) === 'no');
+              }
+            }
+
+            if (selectedInput) break;
           }
         }
       }
 
-      // Execute click if option found
+      // 8. Safe Default for unrecognized Yes/No questions
+      if (!selectedInput) {
+        selectedInput = radioInputs.find(r => getRadioText(r, containerEl) === 'yes') ||
+          radioInputs.find(r => getRadioText(r, containerEl).includes('yes'));
+      }
+
       if (selectedInput && !selectedInput.checked) {
         console.log('[Indeed SpeedFill] Auto-selecting radio option:', getRadioText(selectedInput, containerEl));
-        selectedInput.click();
-        selectedInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+        // RESTORE: Single targeted clicks to prevent React from toggling the custom radio OFF
+        const clickTarget = selectedInput.closest('label') || selectedInput.parentElement || selectedInput;
+        try { clickTarget.click(); } catch (e) {}
+        try { selectedInput.click(); } catch (e) {}
+
+        const nativeRadioValueSetter = typeof window !== 'undefined' && window.HTMLInputElement ? Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked')?.set : null;
+        if (nativeRadioValueSetter) {
+          nativeRadioValueSetter.call(selectedInput, true);
+        } else {
+          selectedInput.checked = true;
+        }
+
+        if (selectedInput._valueTracker) {
+          selectedInput._valueTracker.setValue('');
+        }
+        const EventClass = typeof window !== 'undefined' && window.Event ? window.Event : Event;
+        selectedInput.dispatchEvent(new EventClass('input', { bubbles: true }));
+        selectedInput.dispatchEvent(new EventClass('change', { bubbles: true }));
+
         filledCount++;
       }
     });
@@ -233,21 +378,54 @@
   }
 
   function getRadioText(radio, containerEl) {
+    if (!radio) return '';
     let text = '';
+    const scope = containerEl || document;
+
     if (radio.id) {
-      const scope = containerEl || document;
-      const lbl = scope.querySelector(`label[for="${CSS.escape(radio.id)}"]`);
+      let lbl = scope.querySelector(`label[for="${CSS.escape(radio.id)}"]`);
+      if (!lbl && containerEl && scope !== document) {
+        lbl = document.querySelector(`label[for="${CSS.escape(radio.id)}"]`);
+      }
       if (lbl) text = lbl.textContent;
     }
     if (!text && radio.closest('label')) {
       text = radio.closest('label').textContent;
     }
     if (!text && radio.parentElement) {
-      text = radio.parentElement.textContent;
+      const clone = radio.parentElement.cloneNode(true);
+      clone.querySelectorAll('.speedfill-save-btn').forEach(b => b.remove());
+      text = clone.textContent;
     }
-    return text.toLowerCase().trim();
+    if (!text && radio.nextElementSibling && radio.nextElementSibling.textContent) {
+      text = radio.nextElementSibling.textContent;
+    }
+    if (!text && radio.previousElementSibling && radio.previousElementSibling.textContent) {
+      text = radio.previousElementSibling.textContent;
+    }
+    if (!text && radio.value) {
+      text = radio.value;
+    }
+    if (!text && radio.getAttribute('aria-label')) {
+      text = radio.getAttribute('aria-label');
+    }
+
+    text = String(text)
+      .replace(/💾\s*Save to SpeedFill/gi, '')
+      .replace(/Save to SpeedFill/gi, '')
+      .replace(/\s+/g, ' ')
+      .toLowerCase()
+      .trim();
+
+    if (text === '1' || text === 'true') text = 'yes';
+    if (text === '0' || text === 'false') text = 'no';
+
+    return text;
   }
 
+  /**
+   * Handle "Add a resume" step: auto-select existing PDF resume and click Continue
+   */
   /**
    * Handle "Add a resume" step: auto-select existing PDF resume and click Continue
    */
@@ -255,40 +433,55 @@
     const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer();
     if (!appContainer) return false;
 
-    const isResumeStep = Array.from(appContainer.querySelectorAll('h1, h2, h3, legend, header, div')).some(el => {
-      if (window.SpeedFillMatcher?.isNonApplicationInput(el)) return false;
-      const txt = el.textContent.toLowerCase().trim();
-      return txt.includes('add a resume') || txt.includes('select a resume') || txt.includes('choose a resume');
+    // 1. Check for a VISIBLE resume header
+    const headings = Array.from(appContainer.querySelectorAll('h1, h2, h3'));
+    const visibleResumeHeading = headings.find(h => {
+      if (h.offsetWidth === 0 && h.offsetHeight === 0) return false; // MUST BE VISIBLE
+      const t = h.textContent.toLowerCase();
+      return (t.includes('resume') || t.includes('cv')) && !t.includes('review') && !t.includes('question');
     });
 
-    if (!isResumeStep) return false;
+    if (!visibleResumeHeading) return false;
 
-    // Locate all resume cards within application container
-    const resumeCards = Array.from(appContainer.querySelectorAll('[data-testid*="resume"], [class*="ResumeCard"], [class*="resume-option"], div[role="radio"]'));
+    // 2. Check for VISIBLE resume cards
+    const potentialCards = Array.from(appContainer.querySelectorAll('[data-testid*="resume"], [class*="ResumeCard"], [class*="resume-card"], [class*="resume-option"], div[role="radio"]'));
+
+    const resumeCards = potentialCards.filter(card => {
+      if (card.offsetWidth === 0 && card.offsetHeight === 0) return false; // MUST BE VISIBLE
+      const txt = card.textContent.toLowerCase();
+      return txt.includes('.pdf') || txt.includes('.doc') || txt.includes('uploaded');
+    });
+
     if (resumeCards.length === 0) return false;
 
     let targetCard = null;
     const targetResumeName = userProfile?.work?.targetRole?.targetResumeName?.toLowerCase().trim();
 
-    // 1. Try to find a specific resume if user defined one
     if (targetResumeName) {
       targetCard = resumeCards.find(card => card.textContent.toLowerCase().includes(targetResumeName));
     }
-
-    // 2. Fallback to the first resume if no specific target or not found
     if (!targetCard) {
       targetCard = resumeCards[0];
     }
 
-    if (targetCard && !targetCard.classList.contains('selected') && targetCard.getAttribute('aria-checked') !== 'true') {
+    const isAlreadySelected = targetCard &&
+      (targetCard.classList.contains('selected') ||
+       targetCard.getAttribute('aria-checked') === 'true' ||
+       targetCard.getAttribute('aria-selected') === 'true');
+
+    if (targetCard && !isAlreadySelected) {
       console.log('[Indeed SpeedFill] Auto-selecting resume...');
       targetCard.click();
     }
 
     const delay = userProfile?.settings?.stepDelayMs || 500;
     if (userProfile?.settings?.autoSelectResume !== false || userProfile?.settings?.autoAdvanceStep !== false) {
-      clearTimeout(window._speedfillAdvanceTimer);
-      window._speedfillAdvanceTimer = setTimeout(() => clickContinueButton(appContainer), delay);
+      if (!window._speedfillAdvanceTimer) {
+        window._speedfillAdvanceTimer = setTimeout(() => {
+          window._speedfillAdvanceTimer = null;
+          clickContinueButton(appContainer);
+        }, delay);
+      }
       return true;
     }
     return false;
@@ -299,7 +492,8 @@
    */
   function detectCaptchaAndNotify() {
     const hasCaptchaElement = document.querySelector('iframe[src*="recaptcha"], iframe[title*="recaptcha"], .g-recaptcha, [class*="captcha"]');
-    const hasCaptchaText = document.body.innerText.includes("I'm not a robot") || document.body.innerText.includes("reCAPTCHA");
+    const bodyText = document.body ? (document.body.innerText || document.body.textContent || '') : '';
+    const hasCaptchaText = bodyText.includes("I'm not a robot") || bodyText.includes("reCAPTCHA");
 
     if ((hasCaptchaElement || hasCaptchaText) && !hasNotifiedCaptcha) {
       hasNotifiedCaptcha = true;
@@ -349,13 +543,14 @@
         if (!match || !match.value) {
           unmatchedCount++;
           el.classList.add('speedfill-warning');
+          // Automatically render save button
+          if (typeof injectSaveButton === 'function') injectSaveButton(el);
         }
       } else {
         el.classList.remove('speedfill-warning');
       }
     });
 
-    // Check unfilled radio button groups
     const radioContainers = appContainer.querySelectorAll('fieldset, [role="radiogroup"], .ia-Questions-item');
     radioContainers.forEach(container => {
       if (window.SpeedFillMatcher?.isInsideExcludedContainer(container)) return;
@@ -367,6 +562,8 @@
         if (!radios.some(r => r.checked)) {
           unmatchedCount++;
           container.classList.add('speedfill-warning');
+          // Automatically render save button for empty radio groups
+          if (typeof injectSaveButton === 'function') injectSaveButton(container, radios[0]);
         } else {
           container.classList.remove('speedfill-warning');
         }
@@ -397,29 +594,32 @@
   }
 
   function injectSaveButton(container, inputEl = null) {
-    if (container.dataset.speedfillSaveInjected) return;
+    // FOOLPROOF DUPLICATE PREVENTION: Physically check if the button already exists in the DOM
+    if (container.querySelector('.speedfill-save-btn')) return;
+    if (container.parentElement && container.parentElement.querySelector('.speedfill-save-btn')) return;
+    if (container.dataset.speedfillSaveInjected === 'true') return;
+
     container.dataset.speedfillSaveInjected = 'true';
 
     const btn = document.createElement('button');
     btn.className = 'speedfill-save-btn';
     btn.type = 'button';
     btn.innerHTML = '💾 Save to SpeedFill';
-    
+
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      
+
       const targetInput = inputEl || container;
       const appContainer = window.SpeedFillMatcher?.getAppContainer() || document;
-      
-      // Get Question Text
+
       let headerEl = null;
       if (inputEl && inputEl.type === 'radio') {
         headerEl = container.querySelector('legend, h1, h2, h3, h4, label, [class*="label"], [class*="header"]');
       } else {
         headerEl = appContainer.querySelector(`label[for="${CSS.escape(targetInput.id)}"]`) || container.closest('label') || container.previousElementSibling;
       }
-      
+
       let questionText = '';
       if (headerEl) {
         const clone = headerEl.cloneNode(true);
@@ -432,13 +632,18 @@
         clone.querySelectorAll('.speedfill-save-btn').forEach(b => b.remove());
         questionText = clone.innerText ? clone.innerText.split('\n')[0] : clone.textContent.trim();
       }
-      
+
       if (!questionText) questionText = 'Unknown Question';
 
-      // Clean Question
-      questionText = questionText.replace(/[^a-zA-Z0-9 ]/g, '').toLowerCase().substring(0, 80).trim();
+      questionText = questionText
+        .replace(/how would you rate your/gi, '')
+        .replace(/what is/gi, '')
+        .replace(/please select/gi, '')
+        .replace(/[^a-zA-Z0-9 ]/g, '')
+        .toLowerCase()
+        .substring(0, 80)
+        .trim();
 
-      // Get Answer
       let answerText = '';
       if (inputEl && inputEl.type === 'radio') {
         const selected = container.querySelector('input[type="radio"]:checked');
@@ -453,7 +658,6 @@
         return;
       }
 
-      // Save to Storage
       if (userProfile && userProfile.screening) {
         userProfile.screening.push({ keywords: questionText, answer: answerText });
         chrome.storage.local.set({ userProfile: userProfile }, () => {
@@ -461,24 +665,23 @@
           btn.classList.add('saved');
           btn.disabled = true;
           console.log('[SpeedFill] Saved new Q&A:', questionText, '->', answerText);
-          
-          // Trigger manual input check to resume auto-advance
+
+          // Force form validation re-check to trigger auto-advance
           setTimeout(() => {
-            handleUserManualInput();
+            handleUserManualInput({ isTrusted: true, target: targetInput });
           }, 300);
         });
       }
     });
 
     if (inputEl && inputEl.type === 'radio') {
-      const header = container.querySelector('legend, h1, h2, h3, h4');
+      const header = container.querySelector('legend, h1, h2, h3, h4, label, [class*="label"], [class*="header"]');
       if (header) {
         header.appendChild(btn);
       } else {
         container.appendChild(btn);
       }
     } else {
-      // Safely inject below the input's wrapper to avoid breaking borders
       const wrapper = container.closest('.ia-Questions-item') || container.parentElement;
       if (wrapper && wrapper.nextSibling) {
         wrapper.parentNode.insertBefore(btn, wrapper.nextSibling);
@@ -487,8 +690,6 @@
       } else {
         container.parentNode.insertBefore(btn, container.nextSibling);
       }
-      
-      // Ensure the button is styled to sit nicely below
       btn.style.display = 'block';
       btn.style.marginTop = '6px';
       btn.style.marginLeft = '0';
@@ -496,21 +697,24 @@
   }
 
   function handleUserManualInput(e) {
+    // If triggered by a browser event, enforce the human-click rule to prevent loops.
+    // BUT allow programmatic calls (where e is undefined) to pass through.
+    if (e && !e.isTrusted) return;
+
     if (e && e.target && e.target.tagName && !e.target.dataset.speedfillSaveInjected) {
       const el = e.target;
       if (el.tagName.toLowerCase() === 'input' || el.tagName.toLowerCase() === 'textarea' || el.tagName.toLowerCase() === 'select') {
-        
+
         // FILTER: Do not inject on global search inputs
         if (window.SpeedFillMatcher?.isSearchInput && window.SpeedFillMatcher.isSearchInput(el)) {
           return;
         }
 
         // FILTER: If this is a standard recognized field, DO NOT inject the Q&A save button.
-        // UNLESS it's a radio button, because standard fields don't auto-select radio groups well, so letting the user save it as a Custom Q&A works best.
         if (el.type !== 'radio') {
           const match = window.SpeedFillMatcher?.matchField(el, userProfile);
           if (match !== null && match !== undefined) {
-            return; 
+            return;
           }
         }
 
@@ -594,7 +798,7 @@
           title: currentJobTitle,
           company: currentCompany,
           url: window.location.href.split('?')[0],
-          date: new Date().toLocaleDateString() + ', ' + new Date().toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true })
+          date: new Date().toISOString()
         }
       });
 
@@ -614,7 +818,7 @@
 
     const titleEl = scope.querySelector('.ia-JobHeader-title, h1, h2, [class*="jobTitle"]');
     const companyEl = scope.querySelector('.ia-JobHeader-company, [class*="companyName"]');
-    
+
     if (titleEl && titleEl.textContent) {
       const txt = titleEl.textContent.trim();
       // Ignore generic modal headers
@@ -622,7 +826,7 @@
         currentJobTitle = txt;
       }
     }
-    
+
     if (companyEl && companyEl.textContent) {
       const txt = companyEl.textContent.trim();
       if (txt.length > 1) {
@@ -634,7 +838,7 @@
     if (currentJobTitle === 'Unknown Role' || currentCompany === 'Unknown Company') {
       const pageTitle = document.title || '';
       let parsedTitle = pageTitle.replace(' - Indeed', '').replace('Apply for ', '').replace('Apply: ', '').trim();
-      
+
       if (parsedTitle.includes(' at ')) {
         const parts = parsedTitle.split(' at ');
         if (currentCompany === 'Unknown Company') currentCompany = parts.pop().trim();
@@ -682,11 +886,13 @@
    */
   function clickContinueButton(containerArg) {
     clearTimeout(window._speedfillAdvanceTimer);
+    window._speedfillAdvanceTimer = null; 
     const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer();
     if (!appContainer) return false;
 
     const buttons = Array.from(appContainer.querySelectorAll('button, a[role="button"]'));
     const continueBtn = buttons.find(b => {
+      if (b.offsetWidth === 0 && b.offsetHeight === 0) return false; // MUST BE VISIBLE
       if (window.SpeedFillMatcher?.isNonApplicationInput(b)) return false;
       const text = b.textContent.toLowerCase().trim();
       const isDisabled = b.disabled || b.getAttribute('aria-disabled') === 'true';
@@ -738,7 +944,7 @@
 
       const match = window.SpeedFillMatcher?.matchField(input, userProfile);
       if (match && match.value) {
-        const success = setReactInputValue(input, match.value);
+        const success = window.SpeedFillMatcher.setNativeInputValue(input, match.value);
         if (success) filledCount++;
       }
     });
@@ -763,37 +969,50 @@
     // Attach manual fill auto-advance listeners
     attachInteractiveAutoAdvanceListeners(appContainer);
 
-    // 5. Check for unfilled unmatched fields that require user input
-    const unmatchedCount = checkUnmatchedUnfilledFields(appContainer);
-    updatePillStatus(unmatchedCount, filledCount);
-
+    // 5. Delay the unmatched field check so React has time to re-render radio selections.
+    //    Running this synchronously sees stale r.checked = false even after a successful click.
     const stepDelay = userProfile?.settings?.stepDelayMs !== undefined ? userProfile.settings.stepDelayMs : 150;
+    const runUnmatchedCheck = () => {
+      const unmatchedCount = checkUnmatchedUnfilledFields(appContainer);
+      updatePillStatus(unmatchedCount, filledCount);
 
-    // 6. PAUSE AUTO-ADVANCE / SUBMIT if there are unmatched empty fields and feature is enabled
-    if (unmatchedCount > 0 && userProfile?.settings?.pauseOnUnmatchedFields !== false) {
-      console.log(`[Indeed SpeedFill] Pausing auto-advance: ${unmatchedCount} field(s) need manual input/dashboard entry.`);
-      return filledCount;
-    }
+      // 6. PAUSE AUTO-ADVANCE / SUBMIT if there are unmatched empty fields and feature is enabled
+      if (unmatchedCount > 0 && !handledResume && userProfile?.settings?.pauseOnUnmatchedFields !== false) {
+        console.log(`[Indeed SpeedFill] Pausing auto-advance: ${unmatchedCount} field(s) need manual input/dashboard entry.`);
+        return;
+      }
 
-    // 7. Check for auto-submit & monitor CAPTCHA resolution
-    if (userProfile?.settings?.autoSubmitApplication !== false) {
-      setTimeout(() => clickSubmitButton(appContainer), stepDelay);
-      monitorCaptchaAndSubmit(appContainer);
-    }
+      // 7. Check for auto-submit & monitor CAPTCHA resolution
+      if (userProfile?.settings?.autoSubmitApplication !== false) {
+        setTimeout(() => clickSubmitButton(appContainer), stepDelay);
+        monitorCaptchaAndSubmit(appContainer);
+      }
 
-    // 8. Optionally auto-advance intermediate steps
-    if ((userProfile?.settings?.autoAdvanceStep !== false || handledResume) && (filledCount > 0 || handledResume)) {
-      const hasUnsaved = appContainer.querySelectorAll('.speedfill-save-btn:not(.saved)').length > 0;
-      if (!hasUnsaved) {
-        clearTimeout(window._speedfillAdvanceTimer);
-        window._speedfillAdvanceTimer = setTimeout(() => clickContinueButton(appContainer), stepDelay);
-      } else {
-        const pill = document.getElementById('speedfill-floating-pill');
-        if (pill) {
-          pill.classList.add('pill-warning');
-          pill.innerHTML = `<span>⏸️ Paused (Save to Resume)</span>`;
+      // 8. Optionally auto-advance intermediate steps when all required fields on screen are filled
+      if (unmatchedCount === 0 && !handledResume && userProfile?.settings?.autoAdvanceStep !== false) {
+        const hasUnsaved = appContainer.querySelectorAll('.speedfill-save-btn:not(.saved)').length > 0;
+        if (!hasUnsaved) {
+          if (!window._speedfillAdvanceTimer) {
+            window._speedfillAdvanceTimer = setTimeout(() => {
+              window._speedfillAdvanceTimer = null;
+              clickContinueButton(appContainer);
+            }, stepDelay);
+          }
+        } else {
+          const pill = document.getElementById('speedfill-floating-pill');
+          if (pill) {
+            pill.classList.add('pill-warning');
+            pill.innerHTML = `<span>⏸️ Paused (Save to Resume)</span>`;
+          }
         }
       }
+    };
+
+    // If we filled radios, give React 350ms to reconcile before checking unmatched fields
+    if (filledCount > 0) {
+      setTimeout(runUnmatchedCheck, 350);
+    } else {
+      runUnmatchedCheck();
     }
 
     return filledCount;
@@ -852,7 +1071,7 @@
 
   function positionSearchFillButton(btn, searchContainer) {
     if (!btn || !searchContainer) return;
-    
+
     // Place our button exactly to the right of the search container's outer border
     searchContainer.insertAdjacentElement('afterend', btn);
 
@@ -898,24 +1117,22 @@
     const { jobTitle, targetLocation } = window.SpeedFillMatcher?.extractSearchFillData
       ? window.SpeedFillMatcher.extractSearchFillData(activeProfile)
       : {
-          jobTitle: activeProfile?.work?.targetRole?.jobTitle || activeProfile?.work?.currentRole?.jobTitle || activeProfile?.work?.recentJobTitle || activeProfile?.recentJobTitle || '',
-          targetLocation: activeProfile?.work?.targetRole?.targetLocation || activeProfile?.personal?.city || activeProfile?.city || ''
-        };
+        jobTitle: activeProfile?.work?.targetRole?.jobTitle || activeProfile?.work?.currentRole?.jobTitle || activeProfile?.work?.recentJobTitle || activeProfile?.recentJobTitle || '',
+        targetLocation: activeProfile?.work?.targetRole?.targetLocation || activeProfile?.personal?.city || activeProfile?.city || ''
+      };
 
     const { whatInput, whereInput } = window.SpeedFillMatcher?.getSearchInputs
       ? window.SpeedFillMatcher.getSearchInputs(document)
       : {
-          whatInput: document.querySelector('#text-input-what, input[name="q"]'),
-          whereInput: document.querySelector('#text-input-where, input[name="l"]')
-        };
+        whatInput: document.querySelector('#text-input-what, input[name="q"]'),
+        whereInput: document.querySelector('#text-input-where, input[name="l"]')
+      };
 
     let filledCount = 0;
 
     if (whatInput && jobTitle) {
       if (window.SpeedFillMatcher?.setNativeInputValue) {
         window.SpeedFillMatcher.setNativeInputValue(whatInput, jobTitle);
-      } else {
-        setReactInputValue(whatInput, jobTitle);
       }
       filledCount++;
     }
@@ -923,8 +1140,6 @@
     if (whereInput && targetLocation) {
       if (window.SpeedFillMatcher?.setNativeInputValue) {
         window.SpeedFillMatcher.setNativeInputValue(whereInput, targetLocation);
-      } else {
-        setReactInputValue(whereInput, targetLocation);
       }
       filledCount++;
     }
@@ -943,8 +1158,17 @@
       let shouldFill = false;
       for (const m of mutations) {
         if (m.addedNodes.length > 0) {
-          shouldFill = true;
-          break;
+          // Ignore mutations caused by SpeedFill's own DOM injections (Save buttons, pill, warning classes)
+          // to prevent the observer from re-triggering fillCurrentForm in an infinite loop.
+          const isOwnMutation = Array.from(m.addedNodes).every(node => {
+            if (node.nodeType !== 1) return true; // text nodes are fine
+            const cls = (node.className || '').toString();
+            return cls.includes('speedfill') || cls.includes('indeed-search-fill-btn');
+          });
+          if (!isOwnMutation) {
+            shouldFill = true;
+            break;
+          }
         }
       }
 
@@ -958,7 +1182,7 @@
               fillCurrentForm();
             }
           }
-        }, 50); // Aggressive 50ms DOM mutation debounce
+        }, 400); // 400ms debounce — gives React time to re-render after radio clicks
       }
     });
 
@@ -975,50 +1199,20 @@
         return;
       }
       const submitted = clickSubmitButton(appContainer);
-      handleResumeStep(appContainer);
       const filled = submitted ? 0 : fillCurrentForm();
-      clickContinueButton(appContainer);
       sendResponse({ status: 'done', filled, submitted });
     }
   });
 
-  // Extract and save applied job keys when visiting Indeed pages or My Jobs
-  function autoExtractAppliedJobs() {
-    try {
-      const pageText = document.documentElement.outerHTML || '';
-      const foundJks = new Set();
-      const regexes = [
-        /jk=([a-f0-9]{16})/gi,
-        /data-jk="([a-f0-9]{16})"/gi,
-        /"jobkey":"([a-f0-9]{16})"/gi,
-        /"jk":"([a-f0-9]{16})"/gi
-      ];
-      regexes.forEach(rgx => {
-        let match;
-        while ((match = rgx.exec(pageText)) !== null) {
-          if (match[1]) foundJks.add(match[1]);
-        }
-      });
-      if (foundJks.size > 0) {
-        chrome.storage.local.get(['appliedJobs'], (res) => {
-          const existing = new Set(res.appliedJobs || []);
-          foundJks.forEach(k => existing.add(k));
-          chrome.storage.local.set({ appliedJobs: Array.from(existing) });
-        });
-      }
-    } catch(e){}
-  }
-
   // Initialization & Repeated Fill Retries for async React rendering
   loadProfile(() => {
     setupDOMObserver();
-    autoExtractAppliedJobs();
     injectSearchFillButton();
     setInterval(injectSearchFillButton, 1000);
-    
-    setTimeout(fillCurrentForm, 100); // 100ms
-    setTimeout(fillCurrentForm, 400); // 400ms
-    setTimeout(fillCurrentForm, 1000); // 1s
+
+    setTimeout(fillCurrentForm, 100);
+    setTimeout(fillCurrentForm, 400);
+    setTimeout(fillCurrentForm, 1000);
     monitorCaptchaAndSubmit();
   });
 
