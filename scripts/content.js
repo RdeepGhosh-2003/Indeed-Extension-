@@ -782,19 +782,14 @@
   /**
    * Find and click "Submit your application" button as soon as it becomes enabled
    */
-  function clickSubmitButton(containerArg) {
-    const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer();
-    if (!appContainer) return false;
-
-    const buttons = Array.from(appContainer.querySelectorAll('button, a[role="button"], input[type="submit"]'));
+  function clickSubmitButton() {
+    // 🚀 Search the entire document to bypass React portals and sticky footers
+    const buttons = Array.from(document.querySelectorAll('button, a[role="button"], input[type="submit"], div[role="button"]'));
     const submitBtn = buttons.find(b => {
-      if (b.offsetWidth === 0 && b.offsetHeight === 0) return false; // MUST BE VISIBLE
-      const text = b.textContent.toLowerCase().trim();
+      if (b.offsetWidth === 0 && b.offsetHeight === 0) return false; 
+      const text = (b.textContent || b.innerText || '').toLowerCase().trim();
       const isDisabled = b.disabled || b.getAttribute('aria-disabled') === 'true' || b.classList.contains('disabled');
-      return (
-        text.includes('submit your application') ||
-        text.includes('submit application')
-      ) && !isDisabled;
+      return (text === 'submit your application' || text === 'submit application' || text.includes('submit your application')) && !isDisabled;
     });
 
     if (submitBtn) {
